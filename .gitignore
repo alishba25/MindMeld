@@ -1,0 +1,5 @@
+*.db           # Exclude SQLite database (users.db)
+__pycache__/   # Exclude Python bytecode
+*.pyc
+*.pyo
+*.pyd

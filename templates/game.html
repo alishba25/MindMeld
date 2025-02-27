@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindMeld - Level {{ level }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="title">Level {{ level }}</h1>
+        <div class="game-grid">
+            <div class="puzzle-section">
+                <h2>Puzzle</h2>
+                <p id="puzzle-text">Loading puzzle...</p>
+                <div class="progress-bar">
+                    <div id="timer-bar" style="width: 100%;"></div>
+                </div>
+                <span id="timer">60s</span>
+            </div>
+            <div class="chat-section">
+                <h2>Chat</h2>
+                <div id="chat-box"></div>
+                <div class="input-area">
+                    <input id="msg-input" type="text" placeholder="Chat or 'solve <guess>'">
+                    <button onclick="sendMessage()">Send</button>
+                </div>
+            </div>
+            <div class="info-section">
+                <div class="scores">
+                    <h2>Scores</h2>
+                    <ul id="score-list"></ul>
+                </div>
+                <div class="players">
+                    <h2>Players</h2>
+                    <ul id="player-list"></ul>
+                </div>
+            </div>
+        </div>
+        <a href="/" class="back-btn">Back to Hub</a>
+    </div>
+    <script src="/static/script.js"></script>
+    <script>
+        socket.emit('join', { level: {{ level }} });
+    </script>
+</body>
+</html>
