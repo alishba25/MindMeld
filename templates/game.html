@@ -44,6 +44,13 @@
     <script src="/static/script.js"></script>
     <script>
         socket.emit('join', { level: {{ level }} });
+        socket.on('level_complete', (msg) => {
+            document.getElementById('chat-box').innerHTML += `<p style="color: #00ff00; font-weight: bold;">${msg}</p>`;
+            document.getElementById('puzzle-text').textContent = "Level Completed!";
+            document.getElementById('timer').textContent = "0s";
+            document.getElementById('timer-bar').style.width = "0%";
+            document.getElementById('msg-input').disabled = true;
+        });
     </script>
 </body>
 </html>

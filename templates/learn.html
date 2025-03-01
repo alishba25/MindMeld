@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learn Level {{ level }} - MindMeld</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Learn Level {{ level }}</h1>
+        <div class="learn-box">
+            {% if level == 1 %}
+                <h2>🦁 Animal Code Adventure</h2>
+                <p>Animals send secret messages by shifting their names! Move each letter forward (like A to B) to crack the code. 🐾</p>
+                <p>Example: {{ learn_puzzle[1] }}</p>
+            {% elif level == 2 %}
+                <h2>🚀 Space Signals</h2>
+                <p>Aliens talk with beeps and boops (dots "." and dashes "-")! Each letter has a special sound. 🌟</p>
+                <p>Example: {{ learn_puzzle[1] }}</p>
+            {% elif level == 3 %}
+                <h2>🦸 Superhero Riddles</h2>
+                <p>Heroes leave sneaky clues! Guess what they use to save the day. 💥</p>
+                <p>Example: {{ learn_puzzle[1] }}</p>
+            {% elif level == 4 %}
+                <h2>🤖 Robot Words</h2>
+                <p>Robots speak in 0s and 1s! Each letter has a secret code to figure out their funny sounds. ⚡</p>
+                <p>Example: {{ learn_puzzle[1] }}</p>
+            {% elif level == 5 %}
+                <h2>✨ Magic Letters</h2>
+                <p>Wizards mix up spell words! Shift the letters back to find the magic. 🪄</p>
+                <p>Example: {{ learn_puzzle[1] }}</p>
+            {% elif level == 6 %}
+                <h2>🔢 Number Adventures</h2>
+                <p>Numbers are everywhere! Solve fun counting puzzles to win. 🌈</p>
+                <p>Example: {{ learn_puzzle[1] }}</p>
+            {% endif %}
+            <a href="/game/{{ level }}" class="play-btn">Ready? Play Level {{ level }}! 🎉</a>
+        </div>
+        <a href="/" class="back-btn">Back to Hub</a>
+    </div>
+</body>
+</html>

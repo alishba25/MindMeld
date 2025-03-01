@@ -6,6 +6,7 @@
     <title>MindMeld - Hub</title>
     <link rel="stylesheet" href="/static/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
 </head>
 <body>
     <div class="container">
@@ -37,17 +38,108 @@
         {% else %}
             <div class="menu-box">
                 <h2>Welcome, {{ username }}!</h2>
-                <div class="level-grid">
-                    {% for level in levels %}
-                        <a href="/game/{{ level }}" class="level-btn" data-level="{{ level }}">Level {{ level }}</a>
-                    {% endfor %}
-                    {% for level in range(levels[-1] + 1, 4) %}
-                        <span class="level-btn locked" data-level="{{ level }}">Level {{ level }} (Locked)</span>
-                    {% endfor %}
+                <div class="level-grid" id="level-grid">
+                    <div class="level-item">
+                        <span class="level-title">Level 1: Animal Code</span>
+                        {% if 1 in levels %}
+                            <a href="/learn/1" class="level-btn learn-btn" data-level="1">Learn</a>
+                            <a href="/game/1" class="level-btn play-btn" data-level="1">Play</a>
+                        {% else %}
+                            <span class="level-btn locked" data-level="1">Locked</span>
+                        {% endif %}
+                    </div>
+                    <div class="level-item">
+                        <span class="level-title">Level 2: Space Signals</span>
+                        {% if 2 in levels %}
+                            <a href="/learn/2" class="level-btn learn-btn" data-level="2">Learn</a>
+                            <a href="/game/2" class="level-btn play-btn" data-level="2">Play</a>
+                        {% else %}
+                            <span class="level-btn locked" data-level="2">Locked</span>
+                        {% endif %}
+                    </div>
+                    <div class="level-item">
+                        <span class="level-title">Level 3: Superhero Riddles</span>
+                        {% if 3 in levels %}
+                            <a href="/learn/3" class="level-btn learn-btn" data-level="3">Learn</a>
+                            <a href="/game/3" class="level-btn play-btn" data-level="3">Play</a>
+                        {% else %}
+                            <span class="level-btn locked" data-level="3">Locked</span>
+                        {% endif %}
+                    </div>
+                    <div class="level-item">
+                        <span class="level-title">Level 4: Robot Words</span>
+                        {% if 4 in levels %}
+                            <a href="/learn/4" class="level-btn learn-btn" data-level="4">Learn</a>
+                            <a href="/game/4" class="level-btn play-btn" data-level="4">Play</a>
+                        {% else %}
+                            <span class="level-btn locked" data-level="4">Locked</span>
+                        {% endif %}
+                    </div>
+                    <div class="level-item">
+                        <span class="level-title">Level 5: Magic Letters</span>
+                        {% if 5 in levels %}
+                            <a href="/learn/5" class="level-btn learn-btn" data-level="5">Learn</a>
+                            <a href="/game/5" class="level-btn play-btn" data-level="5">Play</a>
+                        {% else %}
+                            <span class="level-btn locked" data-level="5">Locked</span>
+                        {% endif %}
+                    </div>
+                    <div class="level-item">
+                        <span class="level-title">Level 6: Number Adventures</span>
+                        {% if 6 in levels %}
+                            <a href="/learn/6" class="level-btn learn-btn" data-level="6">Learn</a>
+                            <a href="/game/6" class="level-btn play-btn" data-level="6">Play</a>
+                        {% else %}
+                            <span class="level-btn locked" data-level="6">Locked</span>
+                        {% endif %}
+                    </div>
                 </div>
                 <a href="/logout" class="logout-btn">Logout</a>
             </div>
         {% endif %}
     </div>
+    {% if logged_in %}
+    <script src="/static/script.js"></script>
+    <script>
+        const socket = io();
+        const levels = {{ levels|tojson|safe }};
+        const learned = {{ learned|default('[]')|tojson|safe }};
+
+        socket.on('update_levels', (newLevels) => {
+            updateLevelGrid(newLevels);
+        });
+
+        function updateLevelGrid(levelsArray) {
+            const grid = document.getElementById('level-grid');
+            if (!grid) {
+                console.error("Level grid element not found!");
+                return;
+            }
+            grid.innerHTML = '';
+            const levelTitles = [
+                "Level 1: Animal Code",
+                "Level 2: Space Signals",
+                "Level 3: Superhero Riddles",
+                "Level 4: Robot Words",
+                "Level 5: Magic Letters",
+                "Level 6: Number Adventures"
+            ];
+            for (let i = 1; i <= 6; i++) {
+                grid.innerHTML += `
+                    <div class="level-item">
+                        <span class="level-title">${levelTitles[i-1]}</span>
+                        ${levelsArray.includes(i) ? 
+                            `<a href="/learn/${i}" class="level-btn learn-btn" data-level="${i}">Learn</a>
+                             <a href="/game/${i}" class="level-btn play-btn" data-level="${i}">Play</a>` : 
+                            `<span class="level-btn locked" data-level="${i}">Locked</span>`}
+                    </div>
+                `;
+            }
+        }
+
+        // Initial call to populate grid
+        updateLevelGrid(levels);
+    </script>
+    {% endif %}
 </body>
 </html>
