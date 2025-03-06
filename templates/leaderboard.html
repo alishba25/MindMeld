@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindMeld - Leaderboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">MindMeld - Leaderboard</h1>
+        <div class="menu-box">
+            <h2>Top Players</h2>
+            <div class="leaderboard">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Username</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for i, leader in leaders|enumerate %}
+                        <tr class="{{ 'highlight' if leader[0] == username }}">
+                            <td>{{ i + 1 }}</td>
+                            <td>{{ leader[0] }}</td>
+                            <td>{{ leader[1] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="button-group">
+                <a href="{{ url_for('hub') }}" class="home-btn">Home</a>
+                <a href="{{ url_for('levels') }}" class="home-btn">Levels</a>
+                <a href="{{ url_for('badges') }}" class="badges-btn">Badges</a>
+            </div>
+            <div class="logout-container">
+                <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

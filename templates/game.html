@@ -10,46 +10,397 @@
 </head>
 <body>
     <div class="game-container">
-        <h1 class="title">Level {{ level }}</h1>
-        <div class="game-grid">
-            <div class="puzzle-section">
-                <h2>Puzzle</h2>
-                <p id="puzzle-text">Loading puzzle...</p>
+        <h1 class="title">MindMeld - Level {{ level }}</h1>
+        <div class="game-layout">
+            <div class="game-main">
+                <div id="instructions" class="instructions"></div>
+                <div id="game-board" class="game-board"></div>
+                <div id="word-input" style="display: none; margin-top: 10px;">
+                    <input type="text" id="letter-input" maxlength="1" placeholder="Guess a letter" style="padding: 5px;">
+                    <button id="guess-btn" class="option-btn">Guess</button>
+                </div>
                 <div class="progress-bar">
                     <div id="timer-bar" style="width: 100%;"></div>
                 </div>
                 <span id="timer">60s</span>
+                <p id="missions">Mission Progress: 0/3</p>
             </div>
-            <div class="chat-section">
-                <h2>Chat</h2>
-                <div id="chat-box"></div>
-                <div class="input-area">
-                    <input id="msg-input" type="text" placeholder="Chat or 'solve <guess>'">
-                    <button onclick="sendMessage()">Send</button>
+            <div class="game-side">
+                <div class="chat-section">
+                    <h2>Chat</h2>
+                    <div id="chat-box"></div>
                 </div>
-            </div>
-            <div class="info-section">
-                <div class="scores">
-                    <h2>Scores</h2>
-                    <ul id="score-list"></ul>
-                </div>
-                <div class="players">
+                <div class="info-section">
                     <h2>Players</h2>
                     <ul id="player-list"></ul>
                 </div>
             </div>
         </div>
-        <a href="/" class="back-btn">Back to Hub</a>
+        <a href="/levels" class="back-btn">Back to Levels</a>
+        <a href="/logout" class="logout-btn">Logout</a>
     </div>
-    <script src="/static/script.js"></script>
+    <div id="confetti" class="confetti"></div>
+    <div id="failure" class="failure"></div>
     <script>
+        const socket = io();
         socket.emit('join', { level: {{ level }} });
+        let gameState;
+
+        socket.on('init_game', (data) => {
+            gameState = data.state;
+            document.getElementById('timer').textContent = `${data.time_left}s`;
+            updateTimerBar(data.time_left);
+            renderGame();
+        });
+
+        socket.on('timer_update', (time) => {
+            document.getElementById('timer').textContent = `${time}s`;
+            updateTimerBar(time);
+        });
+
+        socket.on('update_path', (data) => {
+            gameState.grid = data.grid;
+            gameState.moves = data.moves;
+            gameState.pos = data.grid.indexOf("🤖");
+            renderGame();
+        });
+
+        socket.on('place_shape', (data) => {
+            const cell = document.getElementById(`cell-${data.index}`);
+            const slot = document.getElementById(`slot-${data.slot}`);
+            if (cell && slot) {
+                cell.textContent = '';
+                slot.textContent = data.shape;
+                slot.classList.add('placed');
+            }
+        });
+
+        socket.on('update_sum', (data) => {
+            gameState.sum = data.sum;
+            gameState.used = data.used;
+            renderGame();
+        });
+
+        socket.on('word_update', (data) => {
+            gameState.progress = data.word.split(' ');
+            gameState.attempts_left = data.attempts;
+            gameState.guessed_letters = data.guessed;
+            renderGame();
+        });
+
+        socket.on('reset_word', () => {
+            gameState.found = [];
+            renderGame();
+        });
+
+        socket.on('update_switch', (data) => {
+            gameState.grid = data.grid;
+            renderGame();
+        });
+
+        socket.on('reveal_treasure', (data) => {
+            const cell = document.getElementById(`cell-${data.index}`);
+            if (cell) {
+                cell.textContent = data.value;
+                cell.classList.add('revealed');
+            }
+            document.getElementById('instructions').textContent = `Taps Left: ${data.taps}`;
+        });
+
+        socket.on('update_unscramble', (data) => {
+            gameState.guess = data.guess;
+            renderGame();
+        });
+
+        socket.on('reset_unscramble', () => {
+            gameState.guess = [];
+            renderGame();
+        });
+
+        socket.on('place_piece', (data) => {
+            const piece = document.getElementById(`piece-${data.index}`);
+            const slot = document.getElementById(`slot-${data.slot}`);
+            if (piece && slot) {
+                piece.style.display = 'none';
+                slot.textContent = data.piece;
+                slot.classList.add('placed');
+            }
+        });
+
+        socket.on('mission_complete', (msg) => {
+            document.getElementById('missions').textContent = msg;
+            showConfetti();
+        });
+
         socket.on('level_complete', (msg) => {
             document.getElementById('chat-box').innerHTML += `<p style="color: #00ff00; font-weight: bold;">${msg}</p>`;
-            document.getElementById('puzzle-text').textContent = "Level Completed!";
+            document.getElementById('game-board').innerHTML = "Level Completed!";
+            document.getElementById('game-board').classList.add('win');
             document.getElementById('timer').textContent = "0s";
             document.getElementById('timer-bar').style.width = "0%";
-            document.getElementById('msg-input').disabled = true;
+            showConfetti();
+        });
+
+        socket.on('game_over', (msg) => {
+            document.getElementById('chat-box').innerHTML += `<p>${msg}</p>`;
+            showFailure();
+            setTimeout(renderGame, 1000);
+        });
+
+        socket.on('animate_win', () => {
+            const boardenergy = document.getElementById('game-board');
+            boardenergy.classList.add('win');
+            setTimeout(() => boardenergy.classList.remove('win'), 1000);
+        });
+
+        socket.on('round_transition', () => {
+            const boardenergy = document.getElementById('game-board');
+            boardenergy.classList.add('round-transition');
+            setTimeout(() => boardenergy.classList.remove('round-transition'), 500);
+        });
+
+        socket.on('message', (msg) => {
+            document.getElementById('chat-box').innerHTML += `<p>${msg}</p>`;
+        });
+
+        function updateTimerBar(time) {
+            const bar = document.getElementById('timer-bar');
+            const percentage = (time / 60) * 100;
+            bar.style.width = `${percentage}%`;
+            bar.style.background = time <= 10 ? 'linear-gradient(90deg, #ff4d4d, #ff7676)' : 'linear-gradient(90deg, #00d4ff, #007bff)';
+        }
+
+        function renderGame() {
+            const boardenergy = document.getElementById('game-board');
+            const instructions = document.getElementById('instructions');
+            const wordInput = document.getElementById('word-input');
+            boardenergy.innerHTML = '';
+            boardenergy.classList.remove('win');
+            wordInput.style.display = 'none';
+
+            if (gameState.type === "path") {
+                boardenergy.style.gridTemplateColumns = `repeat(${gameState.size}, 1fr)`;
+                boardenergy.style.gridTemplateRows = `repeat(${gameState.size}, 1fr)`;
+                gameState.grid.forEach((item, index) => {
+                    const cell = document.createElement('div');
+                    cell.id = `cell-${index}`;
+                    cell.className = 'game-cell';
+                    cell.textContent = item || '';
+                    if (item === "🤖" || item === "🏁" || item === "💀") {
+                        cell.style.cursor = 'pointer';
+                        cell.onclick = () => socket.emit('game_action', { sid: socket.id, action: { index: index } });
+                    }
+                    boardenergy.appendChild(cell);
+                });
+                instructions.textContent = `Moves Left: ${gameState.moves}`;
+            } else if (gameState.type === "shape") {
+                boardenergy.style.gridTemplateColumns = "repeat(2, 1fr)";
+                boardenergy.style.gridTemplateRows = "1fr";
+                const shapesDiv = document.createElement('div');
+                gameState.grid.forEach((shape, index) => {
+                    if (!gameState.sorted.includes(shape)) {
+                        const cell = document.createElement('div');
+                        cell.id = `cell-${index}`;
+                        cell.className = 'game-cell shape';
+                        cell.textContent = shape;
+                        cell.draggable = true;
+                        cell.ondragstart = (e) => e.dataTransfer.setData("index", index);
+                        shapesDiv.appendChild(cell);
+                    }
+                });
+                const slotsDiv = document.createElement('div');
+                for (let i = 0; i < gameState.grid.length / 2; i++) {
+                    const slot = document.createElement('div');
+                    slot.id = `slot-${i}`;
+                    slot.className = 'game-cell slot';
+                    slot.textContent = gameState.sorted[i] || '❓';
+                    slot.ondragover = (e) => e.preventDefault();
+                    slot.ondrop = (e) => {
+                        e.preventDefault();
+                        const index = parseInt(e.dataTransfer.getData("index"));
+                        socket.emit('game_action', { sid: socket.id, action: { index: index, slot: i } });
+                    };
+                    slotsDiv.appendChild(slot);
+                }
+                boardenergy.appendChild(shapesDiv);
+                boardenergy.appendChild(slotsDiv);
+                instructions.textContent = `Sort ${gameState.grid.length / 2 - gameState.sorted.length} shapes!`;
+            } else if (gameState.type === "number") {
+                boardenergy.style.gridTemplateColumns = `repeat(${Math.ceil(Math.sqrt(gameState.grid.length))}, 1fr)`;
+                boardenergy.style.gridTemplateRows = `repeat(${Math.ceil(gameState.grid.length / Math.ceil(Math.sqrt(gameState.grid.length)))}, 1fr)`;
+                gameState.grid.forEach((num, index) => {
+                    const cell = document.createElement('div');
+                    cell.id = `cell-${index}`;
+                    cell.className = 'game-cell';
+                    cell.textContent = gameState.used.includes(index) ? "" : num;
+                    cell.onclick = () => socket.emit('game_action', { sid: socket.id, action: { index: index } });
+                    boardenergy.appendChild(cell);
+                });
+                instructions.textContent = `Target: ${gameState.target} (Sum: ${gameState.sum})`;
+            } else if (gameState.type === "word") {
+                boardenergy.style.display = "flex";
+                boardenergy.style.flexDirection = "column";
+                const wordDiv = document.createElement('div');
+                wordDiv.textContent = gameState.progress.join(' ');
+                wordDiv.className = 'guess-text';
+                const guessedDiv = document.createElement('div');
+                guessedDiv.textContent = `Guessed: ${gameState.guessed_letters.join(', ')}`;
+                boardenergy.appendChild(wordDiv);
+                boardenergy.appendChild(guessedDiv);
+                instructions.textContent = `${gameState.hintSentence} (Attempts Left: ${gameState.attempts_left})`;
+                wordInput.style.display = 'block';
+            } else if (gameState.type === "switch") {
+                boardenergy.style.gridTemplateColumns = `repeat(${gameState.size}, 1fr)`;
+                boardenergy.style.gridTemplateRows = `repeat(${gameState.size}, 1fr)`;
+                gameState.grid.forEach((state, index) => {
+                    const cell = document.createElement('div');
+                    cell.id = `cell-${index}`;
+                    cell.className = 'game-cell switch-cell';
+                    cell.textContent = state ? "💡" : "🌑";
+                    cell.style.cursor = 'pointer';
+                    cell.onclick = () => socket.emit('game_action', { sid: socket.id, action: { index: index } });
+                    boardenergy.appendChild(cell);
+                });
+                instructions.textContent = "Turn on all lights!";
+            } else if (gameState.type === "treasure") {
+                boardenergy.style.gridTemplateColumns = `repeat(${gameState.size}, 1fr)`;
+                boardenergy.style.gridTemplateRows = `repeat(${gameState.size}, 1fr)`;
+                gameState.grid.forEach((item, index) => {
+                    const cell = document.createElement('div');
+                    cell.id = `cell-${index}`;
+                    cell.className = 'game-cell';
+                    cell.textContent = gameState.revealed.includes(index) ? gameState.grid[index] : '❓';
+                    if (!gameState.revealed.includes(index)) {
+                        cell.onclick = () => socket.emit('game_action', { sid: socket.id, action: { index: index } });
+                    }
+                    boardenergy.appendChild(cell);
+                });
+                instructions.textContent = `Taps Left: ${gameState.taps}`;
+            } else if (gameState.type === "unscramble") {
+                boardenergy.style.display = "flex";
+                boardenergy.style.flexDirection = "column";
+                const lettersDiv = document.createElement('div');
+                gameState.letters.forEach((letter, index) => {
+                    if (!gameState.guess.includes(letter)) {
+                        const btn = document.createElement('button');
+                        btn.textContent = letter;
+                        btn.className = 'letter-btn';
+                        btn.onclick = () => socket.emit('game_action', { sid: socket.id, action: { index: index } });
+                        lettersDiv.appendChild(btn);
+                    }
+                });
+                const guessDiv = document.createElement('div');
+                guessDiv.textContent = "Guess: " + gameState.guess.join("");
+                guessDiv.className = 'guess-text';
+                boardenergy.appendChild(lettersDiv);
+                boardenergy.appendChild(guessDiv);
+                instructions.textContent = `Unscramble: "${gameState.phrase}"`;
+            } else if (gameState.type === "pattern") {
+                boardenergy.style.display = "flex";
+                boardenergy.style.flexDirection = "column";
+                const patternDiv = document.createElement('div');
+                patternDiv.textContent = `Pattern: ${gameState.pattern.join(', ')}, ?`;
+                patternDiv.className = 'pattern-text';
+                const optionsDiv = document.createElement('div');
+                gameState.options.forEach((opt, index) => {
+                    const btn = document.createElement('button');
+                    btn.textContent = opt;
+                    btn.className = 'option-btn';
+                    btn.onclick = () => socket.emit('game_action', { sid: socket.id, action: { choice: opt } });
+                    optionsDiv.appendChild(btn);
+                });
+                boardenergy.appendChild(patternDiv);
+                boardenergy.appendChild(optionsDiv);
+                instructions.textContent = "Pick the next number!";
+            } else if (gameState.type === "jigsaw") {
+                boardenergy.style.gridTemplateColumns = `repeat(${gameState.size}, 1fr)`;
+                boardenergy.style.gridTemplateRows = `repeat(${gameState.size}, 1fr)`;
+                const piecesDiv = document.createElement('div');
+                gameState.pieces.forEach((piece, index) => {
+                    if (!gameState.placed.includes(piece)) {
+                        const cell = document.createElement('div');
+                        cell.id = `piece-${index}`;
+                        cell.className = 'game-cell piece';
+                        cell.textContent = '🖼️';
+                        cell.draggable = true;
+                        cell.ondragstart = (e) => e.dataTransfer.setData("index", index);
+                        piecesDiv.appendChild(cell);
+                    }
+                });
+                const slotsDiv = document.createElement('div');
+                slotsDiv.style.display = "grid";
+                slotsDiv.style.gridTemplateColumns = `repeat(${gameState.size}, 1fr)`;
+                for (let i = 0; i < gameState.size * gameState.size; i++) {
+                    const slot = document.createElement('div');
+                    slot.id = `slot-${i}`;
+                    slot.className = 'game-cell slot';
+                    slot.textContent = gameState.placed[i] || '❓';
+                    slot.ondragover = (e) => e.preventDefault();
+                    slot.ondrop = (e) => {
+                        e.preventDefault();
+                        const index = parseInt(e.dataTransfer.getData("index"));
+                        socket.emit('game_action', { sid: socket.id, action: { index: index, slot: i } });
+                    };
+                    slotsDiv.appendChild(slot);
+                }
+                boardenergy.appendChild(piecesDiv);
+                boardenergy.appendChild(slotsDiv);
+                instructions.textContent = `Assemble the ${gameState.size}x${gameState.size} puzzle!`;
+            } else if (gameState.type === "riddle") {
+                boardenergy.style.display = "flex";
+                boardenergy.style.flexDirection = "column";
+                const questionDiv = document.createElement('div');
+                questionDiv.textContent = gameState.question;
+                questionDiv.className = 'riddle-text';
+                const optionsDiv = document.createElement('div');
+                gameState.options.forEach((opt, index) => {
+                    const btn = document.createElement('button');
+                    btn.textContent = opt;
+                    btn.className = 'option-btn';
+                    btn.onclick = () => socket.emit('game_action', { sid: socket.id, action: { choice: opt } });
+                    optionsDiv.appendChild(btn);
+                });
+                boardenergy.appendChild(questionDiv);
+                boardenergy.appendChild(optionsDiv);
+                instructions.textContent = "Solve the riddle!";
+            }
+        }
+
+        function showConfetti() {
+            const confetti = document.getElementById('confetti');
+            confetti.style.display = 'block';
+            for (let i = 0; i < 100; i++) {
+                const piece = document.createElement('div');
+                piece.className = 'confetti-piece';
+                piece.style.left = `${Math.random() * 100}vw`;
+                piece.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                piece.style.animationDuration = `${Math.random() * 2 + 1}s`;
+                confetti.appendChild(piece);
+            }
+            setTimeout(() => {
+                confetti.style.display = 'none';
+                confetti.innerHTML = '';
+            }, 3000);
+        }
+
+        function showFailure() {
+            const failure = document.getElementById('failure');
+            failure.style.display = 'block';
+            setTimeout(() => failure.style.display = 'none', 1000);
+        }
+
+        document.getElementById('guess-btn').onclick = () => {
+            const letter = document.getElementById('letter-input').value.trim().toUpperCase();
+            if (letter && gameState.type === "word") {
+                socket.emit('game_action', { sid: socket.id, action: { letter: letter } });
+                document.getElementById('letter-input').value = '';
+            }
+        };
+
+        document.getElementById('letter-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('guess-btn').click();
+            }
         });
     </script>
 </body>

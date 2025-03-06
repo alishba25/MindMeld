@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindMeld - Choose Your Challenge</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">MindMeld - Choose Your Challenge</h1>
+        <div class="menu-box">
+            <h2>Welcome, {{ username }}!</h2>
+            <div class="category-grid">
+                {% for category in categories %}
+                <div class="category-card">
+                    <h3>{{ category }}</h3>
+                    <div class="level-group">
+                        {% if loop.index0 * 3 + 1 <= 30 %}
+                        <div class="level-item">
+                            <span class="level-title">Level {{ loop.index0 * 3 + 1 }}</span>
+                            <div class="button-group-vertical">
+                                <a href="{{ url_for('learn', level=loop.index0 * 3 + 1) }}" class="learn-btn">Learn</a>
+                                <a href="{{ url_for('game', level=loop.index0 * 3 + 1) if loop.index0 * 3 + 1 in unlocked else '#' }}"
+                                   class="level-btn {{ '' if loop.index0 * 3 + 1 in unlocked else 'locked' }}">Play</a>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if loop.index0 * 3 + 2 <= 30 %}
+                        <div class="level-item">
+                            <span class="level-title">Level {{ loop.index0 * 3 + 2 }}</span>
+                            <div class="button-group-vertical">
+                                <a href="{{ url_for('learn', level=loop.index0 * 3 + 2) }}" class="learn-btn">Learn</a>
+                                <a href="{{ url_for('game', level=loop.index0 * 3 + 2) if loop.index0 * 3 + 2 in unlocked else '#' }}"
+                                   class="level-btn {{ '' if loop.index0 * 3 + 2 in unlocked else 'locked' }}">Play</a>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if loop.index0 * 3 + 3 <= 30 %}
+                        <div class="level-item">
+                            <span class="level-title">Level {{ loop.index0 * 3 + 3 }}</span>
+                            <div class="button-group-vertical">
+                                <a href="{{ url_for('learn', level=loop.index0 * 3 + 3) }}" class="learn-btn">Learn</a>
+                                <a href="{{ url_for('game', level=loop.index0 * 3 + 3) if loop.index0 * 3 + 3 in unlocked else '#' }}"
+                                   class="level-btn {{ '' if loop.index0 * 3 + 3 in unlocked else 'locked' }}">Play</a>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="button-group">
+                <a href="{{ url_for('hub') }}" class="home-btn">Home</a>
+                <a href="{{ url_for('leaderboard') }}" class="leaderboard-btn">Leaderboard</a>
+                <a href="{{ url_for('badges') }}" class="badges-btn">Badges</a>
+            </div>
+            <div class="logout-container">
+                <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

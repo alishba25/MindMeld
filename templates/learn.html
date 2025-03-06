@@ -3,42 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Learn Level {{ level }} - MindMeld</title>
+    <title>MindMeld - Learn Level {{ level }}</title>
     <link rel="stylesheet" href="/static/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1 class="title">Learn Level {{ level }}</h1>
-        <div class="learn-box">
-            {% if level == 1 %}
-                <h2>🦁 Animal Code Adventure</h2>
-                <p>Animals send secret messages by shifting their names! Move each letter forward (like A to B) to crack the code. 🐾</p>
-                <p>Example: {{ learn_puzzle[1] }}</p>
-            {% elif level == 2 %}
-                <h2>🚀 Space Signals</h2>
-                <p>Aliens talk with beeps and boops (dots "." and dashes "-")! Each letter has a special sound. 🌟</p>
-                <p>Example: {{ learn_puzzle[1] }}</p>
-            {% elif level == 3 %}
-                <h2>🦸 Superhero Riddles</h2>
-                <p>Heroes leave sneaky clues! Guess what they use to save the day. 💥</p>
-                <p>Example: {{ learn_puzzle[1] }}</p>
-            {% elif level == 4 %}
-                <h2>🤖 Robot Words</h2>
-                <p>Robots speak in 0s and 1s! Each letter has a secret code to figure out their funny sounds. ⚡</p>
-                <p>Example: {{ learn_puzzle[1] }}</p>
-            {% elif level == 5 %}
-                <h2>✨ Magic Letters</h2>
-                <p>Wizards mix up spell words! Shift the letters back to find the magic. 🪄</p>
-                <p>Example: {{ learn_puzzle[1] }}</p>
-            {% elif level == 6 %}
-                <h2>🔢 Number Adventures</h2>
-                <p>Numbers are everywhere! Solve fun counting puzzles to win. 🌈</p>
-                <p>Example: {{ learn_puzzle[1] }}</p>
-            {% endif %}
-            <a href="/game/{{ level }}" class="play-btn">Ready? Play Level {{ level }}! 🎉</a>
+        <h1 class="title">MindMeld - Learn Level {{ level }}</h1>
+        <div class="menu-box">
+            <h2>How to Play Level {{ level }}</h2>
+            <div id="tutorial">
+                {% if level <= 3 %}
+                    <p>Welcome to <strong>Path Finder</strong>! Guide the robot (🤖) to the flag (🏁) by clicking adjacent cells. Avoid skulls (💀) and reach the goal within the move limit.</p>
+                {% elif level <= 6 %}
+                    <p>Welcome to <strong>Shape Sorter</strong>! Drag shapes from the left to matching slots on the right. Sort all pairs to win!</p>
+                {% elif level <= 9 %}
+                    <p>Welcome to <strong>Number Crunch</strong>! Click numbers to add up to the target sum. Pick wisely—you don’t need all the tiles!</p>
+                {% elif level <= 12 %}
+                    <p>Welcome to <strong>Word Weaver</strong>! Guess the hidden word one letter at a time, like Hangman. You have 6 wrong guesses before you lose. Use the hint button in the game to help!</p>
+                    <p>Example: For "PYTHON", guess "P" → "P _ _ _ _ _", then "Y" → "P Y _ _ _ _". Keep going until you solve it!</p>
+                {% elif level <= 15 %}
+                    <p>Welcome to <strong>Switch Swap</strong>! Click a switch to flip it and its neighbors. Turn all lights on (💡) to win!</p>
+                {% elif level <= 18 %}
+                    <p>Welcome to <strong>Treasure Tap</strong>! Click tiles to find treasures (🏴‍☠️) and avoid skulls (💀). Find all treasures within your taps!</p>
+                {% elif level <= 21 %}
+                    <p>Welcome to <strong>Unscramble Words</strong>! Click letters to form the hidden phrase. Solve it before time runs out!</p>
+                {% elif level <= 24 %}
+                    <p>Welcome to <strong>Pattern Recognition</strong>! Study the number sequence and pick the next number from the options.</p>
+                {% elif level <= 27 %}
+                    <p>Welcome to <strong>Jigsaw Puzzle</strong>! Drag pieces to the grid to complete the puzzle. Fit all pieces to win!</p>
+                {% elif level <= 30 %}
+                    <p>Welcome to <strong>Riddles</strong>! Read the riddle and choose the correct answer from the options.</p>
+                {% endif %}
+            </div>
+            <a href="/game/{{ level }}" class="play-btn">Play Level {{ level }}</a>
+            <a href="/levels" class="back-btn">Back to Levels</a>
         </div>
-        <a href="/" class="back-btn">Back to Hub</a>
     </div>
 </body>
 </html>

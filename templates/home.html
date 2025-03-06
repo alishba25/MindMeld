@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindMeld - Home</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">MindMeld</h1>
+        <div class="menu-box">
+            <h2>Welcome, {{ username }}!</h2>
+            <div class="button-group">
+                <a href="/leaderboard" class="home-btn leaderboard-btn">Leaderboard</a>
+                <a href="/levels" class="home-btn play-btn center-play">Play</a>
+                <a href="/badges" class="home-btn badges-btn">Badges</a>
+            </div>
+            <div class="logout-container">
+                <a href="/logout" class="logout-btn">Sign Out</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

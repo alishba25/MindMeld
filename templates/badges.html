@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindMeld - Badges</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">MindMeld - Badges</h1>
+        <div class="menu-box">
+            <h2>Your Badges</h2>
+            <div class="badge-grid">
+                {% for badge in badges %}
+                {% if badge %}
+                <div class="badge-item">{{ badge }}</div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            <div class="button-group">
+                <a href="{{ url_for('hub') }}" class="home-btn">Home</a>
+                <a href="{{ url_for('levels') }}" class="home-btn">Levels</a>
+                <a href="{{ url_for('leaderboard') }}" class="leaderboard-btn">Leaderboard</a>
+            </div>
+            <div class="logout-container">
+                <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

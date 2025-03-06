@@ -10,262 +10,322 @@ app = Flask(__name__)
 app.secret_key = "mindmeld_secret"
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
-# Logging setup
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("MindMeld")
 
-# Database setup with migration
-def init_db():
-    conn = sqlite3.connect('users.db', check_same_thread=False)
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS users (
-        username TEXT PRIMARY KEY,
-        password TEXT,
-        unlocked_levels TEXT,
-        total_score INTEGER DEFAULT 0
-    )''')
-    c.execute("PRAGMA table_info(users)")
-    columns = [col[1] for col in c.fetchall()]
-    if "learned_levels" not in columns:
-        logger.info("Adding learned_levels column to users table")
-        c.execute("ALTER TABLE users ADD COLUMN learned_levels TEXT DEFAULT ''")
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# User and game state
 clients = {}
 game_rooms = {}
 
-# Pre-initialize all rooms (6 levels)
-for level in range(1, 7):
-    room_id = f"level_{level}"
-    game_rooms[room_id] = {
-        "level": level,
-        "puzzle": None,
-        "answer": None,
-        "time_left": 60,
-        "scores": {},
-        "active": False,
-        "players": set(),
-        "timer_thread": None,
-        "questions_asked": [],
-        "correct_count": 0
-    }
+def init_db():
+    with sqlite3.connect('users.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS users 
+                          (username TEXT PRIMARY KEY, password TEXT, score INTEGER DEFAULT 0, 
+                           badges TEXT DEFAULT '', unlocked_levels TEXT DEFAULT '1')''')
+        conn.commit()
 
-# Puzzle generators for Play (3 unique questions)
-def animal_code_play():
-    puzzles = [
-        ("CAT", "I purr and chase mice! Shift my name by 1-5 letters."),
-        ("DOG", "I bark and wag my tail! Shift my name by 1-5 letters."),
-        ("FOX", "I’m sly and live in the woods! Shift my name by 1-5 letters.")
-    ]
-    return puzzles
+init_db()
 
-def space_signals_play():
-    morse_dict = {"M": "--", "O": "---", "N": "-.", "S": "...", "T": "-", "A": ".-", "R": ".-."}
-    puzzles = [
-        ("MOON", "Beep boop! I glow at night: -- --- --- -."),
-        ("STAR", "Beep boop! I twinkle in the sky: ... - .- .-."),
-        ("MARS", "Beep boop! I’m a red planet: -- .- .-. ...")
-    ]
-    return puzzles
-
-def superhero_riddles_play():
-    puzzles = [
-        ("CAPE", "I flap when a hero flies! What am I?"),
-        ("MASK", "I hide a hero’s face! What am I?"),
-        ("BOOM", "I’m the sound of a hero’s punch! What am I?")
-    ]
-    return puzzles
-
-def robot_words_play():
-    binary_dict = {"B": "01000010", "E": "01000101", "P": "01010000", "O": "01001111", 
-                   "Z": "01011010", "A": "01000001"}
-    puzzles = [
-        ("BEEP", "Robot says: 01000010 01000101 01000101 01010000"),
-        ("BOOP", "Robot says: 01000010 01001111 01001111 01010000"),
-        ("ZAP", "Robot says: 01011010 01000001 01010000")
-    ]
-    return puzzles
-
-def magic_letters_play():
-    puzzles = [
-        ("WAND", "A wizard waves me! Shift this spell by 1-5 letters."),
-        ("POOF", "I make things vanish! Shift this spell by 1-5 letters."),
-        ("SPARK", "I light up magic! Shift this spell by 1-5 letters.")
-    ]
-    return puzzles
-
-def number_adventures_play():
-    puzzles = [
-        ("10", "How many fingers do you have?"),
-        ("4", "How many legs does a dog have?"),
-        ("6", "How many legs does a bug have?")
-    ]
-    return puzzles
-
-PUZZLES = {
-    1: animal_code_play,
-    2: space_signals_play,
-    3: superhero_riddles_play,
-    4: robot_words_play,
-    5: magic_letters_play,
-    6: number_adventures_play
-}
-
-# Learn examples (1 unique question per level, different from Play)
-LEARN_PUZZLES = {
-    1: ("PIG", "Shift it: QJH (by 2) → What’s the animal? Answer: PIG 🐷"),
-    2: ("SUN", "Decode: ... ..- -. → What’s this bright thing? Answer: SUN ☀️", {"S": "...", "U": "..-", "N": "-."}),
-    3: ("BAM", "I’m a hero’s kick sound! What am I? Answer: BAM 💥"),
-    4: ("ZIP", "Robot says: 01011010 01001001 01010000 → What’s this? Answer: ZIP ⚡", {"Z": "01011010", "I": "01001001", "P": "01010000"}),
-    5: ("ZAP", "Shift it: ABQ (by 1) → What’s the spell? Answer: ZAP ⚡"),
-    6: ("8", "How many legs does a spider have? Answer: 8 🕷️")
-}
-
-# Generate puzzle based on level (for Play)
-def generate_puzzle(room):
-    level = room["level"]
-    puzzles = PUZZLES[level]()
-    available = [(a, q) for a, q in puzzles if a not in room["questions_asked"]]
-    if not available:
-        return None, None
-    answer, puzzle = random.choice(available)
-    if level == 1 or level == 5:  # Caesar/Substitution Cipher
-        shift = random.randint(1, 5)
-        shifted = "".join(chr((ord(c) - 65 + shift) % 26 + 65) for c in answer)
-        puzzle = f"{puzzle.split('!')[0]}! Here's the code: {shifted}"
-    logger.debug(f"Level {level} Puzzle: {puzzle}, Answer: {answer}")
-    return puzzle, answer
-
-# Timer function
 def timer(room_id):
-    room = game_rooms[room_id]
-    logger.debug(f"Timer started for {room_id}")
-    while room["active"] and room["time_left"] > 0 and room["correct_count"] < 3:
-        room["time_left"] -= 1
-        socketio.emit('timer_update', room["time_left"], room=room_id)
+    room = game_rooms.get(room_id)
+    if not room:
+        return
+    while room["active"] and room["time_left"] > 0:
         time.sleep(1)
-    if room["time_left"] <= 0 and room["correct_count"] < 3:
-        room["active"] = False
-        socketio.emit('game_over', f"Time's up! Answer was {room['answer']}", room=room_id)
-        socketio.sleep(0.5)
-        start_game(room_id)
+        room["time_left"] -= 1
+        emit('timer_update', room["time_left"], room=room_id)
+    if room["active"] and room["time_left"] <= 0:
+        emit('game_over', "Time's up! Try again!", room=room_id)
+        room["state"] = room["mission_states"][room["missions_completed"]]
+        emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
 
-# Start game
-def start_game(room_id):
-    start_time = time.time()
-    room = game_rooms[room_id]
-    if room["correct_count"] >= 3:
-        room["active"] = False
-        socketio.emit('level_complete', "Level Complete! Return to the hub.", room=room_id)
-        logger.debug(f"Level {room['level']} completed in {room_id}")
-        return
-    room["puzzle"], room["answer"] = generate_puzzle(room)
-    if room["puzzle"] is None:
-        room["active"] = False
-        socketio.emit('level_complete', "Level Complete! Return to the hub.", room=room_id)
-        logger.debug(f"Level {room['level']} completed in {room_id} - all questions asked")
-        return
-    room["questions_asked"].append(room["answer"])
-    room["time_left"] = 60
-    room["active"] = True
-    socketio.emit('new_game', {"puzzle": room["puzzle"], "time_left": room["time_left"]}, room=room_id)
-    logger.debug(f"Game started for {room_id} in {time.time() - start_time:.3f}s")
-
-# Login required decorator
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if "username" not in session:
-            return redirect(url_for('index'))
+        if 'username' not in session:
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
-# Routes
-@app.route('/', methods=['GET', 'POST'])
+def update_score_and_badges(room, username):
+    with sqlite3.connect('users.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT score, badges, unlocked_levels FROM users WHERE username = ?", (username,))
+        score, badges, unlocked = cursor.fetchone()
+        score = score + 10 if score else 10
+        badges = badges.split(',') if badges else []
+        unlocked = set(map(int, unlocked.split(','))) if unlocked else {1}
+        
+        if room["missions_completed"] == 3 and room["level"] % 3 == 0:
+            badge = f"Badge_{room['level'] // 3}"
+            if badge not in badges:
+                badges.append(badge)
+                emit('message', f"{username} earned {badge}!", room=room["room_id"])
+        
+        next_level = room["level"] + 1
+        if next_level <= 30:
+            unlocked.add(next_level)
+        
+        cursor.execute("UPDATE users SET score = ?, badges = ?, unlocked_levels = ? WHERE username = ?",
+                       (score, ','.join(badges), ','.join(map(str, unlocked)), username))
+        conn.commit()
+    
+    if room["missions_completed"] == 3:
+        emit('level_complete', f"Level {room['level']} completed by {username}!", room=room["room_id"])
+        room["active"] = False
+
+def generate_unique_states(level):
+    states = []
+    if level <= 3:  # Path Finder
+        for _ in range(3):
+            size = 3 + (level - 1)
+            grid = [""] * (size * size)
+            grid[0] = "🤖"
+            grid[-1] = "🏁"
+            obstacles = (level - 1) * 2 + random.randint(0, 1)
+            obstacle_positions = set()
+            while len(obstacle_positions) < obstacles:
+                pos = random.randint(1, size * size - 2)
+                if pos not in obstacle_positions:
+                    obstacle_positions.add(pos)
+                    grid[pos] = "💀"
+            states.append({"type": "path", "grid": grid.copy(), "size": size, "pos": 0, "moves": 5 + (level - 1) * 2})
+    elif level <= 6:  # Shape Sorter
+        shape_sets = [["⬜", "◯"], ["◯", "△", "★"], ["⬜", "★", "⬟"]]
+        for shapes in shape_sets[:level - 3]:
+            grid = shapes + shapes
+            random.shuffle(grid)
+            states.append({"type": "shape", "grid": grid.copy(), "sorted": []})
+    elif level <= 9:  # Number Crunch
+        targets = [10, 15, 20]
+        for i in range(3):
+            target = targets[level - 7]
+            size = 5 + (level - 7)
+            tiles = []
+            remaining = target
+            subset_size = random.randint(2, 4)
+            for _ in range(subset_size - 1):
+                num = random.randint(1, min(remaining - (subset_size - len(tiles) - 1), 5))
+                tiles.append(num)
+                remaining -= num
+            tiles.append(remaining)
+            for _ in range(size - subset_size):
+                tiles.append(random.randint(1, 5))
+            random.shuffle(tiles)
+            states.append({"type": "number", "grid": tiles.copy(), "target": target, "sum": 0, "used": []})
+    elif level <= 12:  # Word Weaver (Hangman-style)
+        word_sets = [
+            [
+                {"word": "PYTHON", "hint": "I’m a snake and a programming language."},
+                {"word": "CODE", "hint": "I’m what programmers write."},
+                {"word": "SCRIPT", "hint": "I’m a set of instructions for computers."}
+            ],  # Level 10
+            [
+                {"word": "HANGMAN", "hint": "I’m a word-guessing game."},
+                {"word": "GUESS", "hint": "I’m what you do to solve a puzzle."},
+                {"word": "RIDDLE", "hint": "I’m a question that tricks you."}
+            ],  # Level 11
+            [
+                {"word": "DEVELOPER", "hint": "I build software."},
+                {"word": "PROGRAMMING", "hint": "I’m the art of coding."},
+                {"word": "CHALLENGE", "hint": "I’m a tough task to overcome."}
+            ]  # Level 12
+        ]
+        word_data = word_sets[level - 10]
+        for data in word_data:
+            states.append({
+                "type": "word",
+                "word": data["word"],
+                "progress": ['_' for _ in data["word"]],
+                "attempts_left": 6,
+                "guessed_letters": [],
+                "hintSentence": data["hint"]
+            })
+    elif level <= 15:  # Switch Swap
+        def toggle(grid, size, index):
+            for i in [index, index - size, index + size, index - 1, index + 1]:
+                if 0 <= i < size * size and (i // size == index // size or i % size == index % size):
+                    grid[i] = 1 - grid[i]
+        
+        if level == 13:  # Predefined solvable states for 3x3 grid
+            # Mission 1: Toggle corners (0, 2) - solvable with 2 moves
+            grid1 = [1, 1, 1, 1, 1, 1, 1, 1, 1]
+            toggle(grid1, 3, 0)  # Top-left
+            toggle(grid1, 3, 2)  # Top-right
+            states.append({"type": "switch", "grid": grid1.copy(), "size": 3})
+            
+            # Mission 2: Toggle (1, 3, 5) - solvable with 3 moves
+            grid2 = [1, 1, 1, 1, 1, 1, 1, 1, 1]
+            toggle(grid2, 3, 1)  # Top-middle
+            toggle(grid2, 3, 3)  # Middle-left
+            toggle(grid2, 3, 5)  # Middle-right
+            states.append({"type": "switch", "grid": grid2.copy(), "size": 3})
+            
+            # Mission 3: Toggle (0, 4, 8) - solvable with 3 moves
+            grid3 = [1, 1, 1, 1, 1, 1, 1, 1, 1]
+            toggle(grid3, 3, 0)  # Top-left
+            toggle(grid3, 3, 4)  # Center
+            toggle(grid3, 3, 8)  # Bottom-right
+            states.append({"type": "switch", "grid": grid3.copy(), "size": 3})
+        else:
+            # Levels 14 (4x4) and 15 (5x5) use random solvable states
+            for i in range(3):
+                size = 3 + (level - 13)
+                grid = [1] * (size * size)  # Start with all lights on
+                toggle_count = min(size * size, 2 + i + random.randint(0, 2))  # 2-5 toggles
+                toggle_positions = random.sample(range(size * size), toggle_count)
+                for pos in toggle_positions:
+                    toggle(grid, size, pos)
+                states.append({"type": "switch", "grid": grid.copy(), "size": size})
+    elif level <= 18:  # Treasure Tap
+        treasure_counts = [1, 2, 3]
+        for treasures in treasure_counts[:level - 15]:
+            size = 3 + (level - 16)
+            grid = ["🏴‍☠️"] * treasures + ["💀"] * (size * size - treasures)
+            random.shuffle(grid)
+            states.append({"type": "treasure", "grid": grid.copy(), "revealed": [], "taps": 3 + (level - 16) * 2})
+    elif level <= 21:  # Unscramble Words
+        phrase_sets = [["CAT", "HAT"], ["BIG", "DOG", "PIG"], ["RUN", "FUN", "SUN"]]
+        for phrase in phrase_sets[level - 19]:
+            letters = list("".join(phrase.split()))
+            random.shuffle(letters)
+            states.append({"type": "unscramble", "phrase": phrase, "letters": letters.copy(), "guess": []})
+    elif level <= 24:  # Pattern Recognition
+        pattern_sets = [[[1, 2, 3], 4], [[2, 4, 6], 8], [[1, 3, 5], 7]]
+        for pattern, correct in pattern_sets[:level - 21]:
+            options = [correct] + [correct + random.randint(1, 5) for _ in range(3)]
+            random.shuffle(options)
+            states.append({"type": "pattern", "pattern": pattern.copy(), "options": options.copy(), "correct": correct})
+    elif level <= 27:  # Jigsaw Puzzle
+        for i in range(3):
+            size = 2 + (level - 25)
+            pieces = [f"{x},{y}" for x in range(size) for y in range(size)]
+            random.shuffle(pieces)
+            states.append({"type": "jigsaw", "size": size, "pieces": pieces.copy(), "placed": []})
+    elif level <= 30:  # Riddles
+        riddle_sets = [
+            [("I’m tall and green, what am I?", "Tree", ["Car", "Dog", "Tree"])],
+            [("I fly without wings, what am I?", "Kite", ["Bird", "Plane", "Kite"]),
+             ("I’m round and bright, what am I?", "Sun", ["Moon", "Star", "Sun"])],
+            [("I’m full of holes but hold water, what am I?", "Sponge", ["Net", "Bucket", "Sponge"]),
+             ("I’m cold and sweet, what am I?", "Ice", ["Snow", "Cake", "Ice"]),
+             ("I bark but don’t bite, what am I?", "Dog", ["Cat", "Wolf", "Dog"])]
+        ]
+        for riddle in riddle_sets[level - 28]:
+            states.append({"type": "riddle", "question": riddle[0], "options": riddle[2].copy(), "correct": riddle[1]})
+    return states
+
+@app.route('/')
 def index():
+    if 'username' in session:
+        return redirect(url_for('hub'))
+    return render_template('login.html')  # Default to login page
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
     if request.method == 'POST':
-        action = request.form.get('action')
         username = request.form['username']
         password = request.form['password']
-        
-        conn = sqlite3.connect('users.db')
-        c = conn.cursor()
-        
-        if action == "signup":
-            c.execute("SELECT username FROM users WHERE username = ?", (username,))
-            if c.fetchone():
-                conn.close()
-                return render_template('index.html', error="Username already exists!")
-            c.execute("INSERT INTO users (username, password, unlocked_levels, learned_levels) VALUES (?, ?, ?, ?)",
-                     (username, password, "1", ""))
-            conn.commit()
-            session['username'] = username
-            session['unlocked_levels'] = [1]
-            session['learned_levels'] = []
-            conn.close()
-            return render_template('index.html', logged_in=True, levels=session['unlocked_levels'], 
-                                 learned=session['learned_levels'], username=username)
-        
-        elif action == "login":
-            try:
-                c.execute("SELECT password, unlocked_levels, total_score, learned_levels FROM users WHERE username = ?", (username,))
-                result = c.fetchone()
-            except sqlite3.OperationalError as e:
-                logger.error(f"Database error during login: {e}")
-                conn.close()
-                return render_template('index.html', error="Server error, please try again later.")
-            conn.close()
+        with sqlite3.connect('users.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
+            result = cursor.fetchone()
             if result and result[0] == password:
                 session['username'] = username
-                session['unlocked_levels'] = [int(x) for x in result[1].split(',')] if result[1] else [1]
-                session['learned_levels'] = [int(x) for x in result[3].split(',')] if result[3] else []
-                session['total_score'] = result[2]
-                return render_template('index.html', logged_in=True, levels=session['unlocked_levels'], 
-                                     learned=session['learned_levels'], username=username)
-            return render_template('index.html', error="Invalid credentials!")
-    
-    if "username" in session:
-        return render_template('index.html', logged_in=True, levels=session.get('unlocked_levels', [1]), 
-                             learned=session.get('learned_levels', []), username=session['username'])
-    return render_template('index.html')
+                return redirect(url_for('hub'))
+            else:
+                return render_template('login.html', error="Invalid username or password")
+    return render_template('login.html')
 
-@app.route('/learn/<int:level>')
-@login_required
-def learn(level):
-    if level not in session.get('unlocked_levels', []):
-        return redirect(url_for('index'))
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    if level not in session.get('learned_levels', []):
-        session['learned_levels'].append(level)
-        c.execute("UPDATE users SET learned_levels = ? WHERE username = ?",
-                 (",".join(map(str, session['learned_levels'])), session['username']))
-        conn.commit()
-    conn.close()
-    return render_template('learn.html', level=level, learn_puzzle=LEARN_PUZZLES[level])
-
-@app.route('/game/<int:level>')
-@login_required
-def game(level):
-    if level not in session.get('unlocked_levels', []):
-        return redirect(url_for('index'))
-    return render_template('game.html', level=level)
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        with sqlite3.connect('users.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT username FROM users WHERE username = ?", (username,))
+            if cursor.fetchone():
+                return render_template('signup.html', error="Username already exists")
+            cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, password))
+            conn.commit()
+            session['username'] = username
+            return redirect(url_for('hub'))
+    return render_template('signup.html')
 
 @app.route('/logout')
 def logout():
     session.pop('username', None)
-    session.pop('unlocked_levels', None)
-    session.pop('learned_levels', None)
-    return redirect(url_for('index'))
+    return redirect(url_for('login'))
 
-# Socket events
+@app.route('/hub')
+@login_required
+def hub():
+    username = session['username']
+    with sqlite3.connect('users.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT score FROM users WHERE username = ?", (username,))
+        score = cursor.fetchone()[0] or 0
+    return render_template('hub.html', username=username, score=score)
+
+@app.route('/levels')
+@login_required
+def levels():
+    username = session['username']
+    with sqlite3.connect('users.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT unlocked_levels FROM users WHERE username = ?", (username,))
+        unlocked = set(map(int, cursor.fetchone()[0].split(',')))
+    categories = [
+        "Path Finder", "Shape Sorter", "Number Crunch", "Word Weaver",
+        "Switch Swap", "Treasure Tap", "Unscramble Words", "Pattern Recognition",
+        "Jigsaw Puzzle", "Riddles"
+    ]
+    return render_template('levels.html', categories=categories, unlocked=unlocked)
+
+@app.route('/leaderboard')
+@login_required
+def leaderboard():
+    with sqlite3.connect('users.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT username, score FROM users ORDER BY score DESC LIMIT 10")
+        leaders = cursor.fetchall()
+    return render_template('leaderboard.html', leaders=leaders, username=session['username'])
+
+@app.route('/badges')
+@login_required
+def badges():
+    username = session['username']
+    with sqlite3.connect('users.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT badges FROM users WHERE username = ?", (username,))
+        result = cursor.fetchone()
+        badges = result[0].split(',') if result and result[0] else []
+    return render_template('badges.html', badges=badges)
+
+@app.route('/learn/<int:level>')
+@login_required
+def learn(level):
+    if level < 1 or level > 30:
+        return redirect(url_for('levels'))
+    return render_template('learn.html', level=level)
+
+@app.route('/game/<int:level>')
+@login_required
+def game(level):
+    if level < 1 or level > 30:
+        return redirect(url_for('levels'))
+    username = session['username']
+    with sqlite3.connect('users.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT unlocked_levels FROM users WHERE username = ?", (username,))
+        unlocked = set(map(int, cursor.fetchone()[0].split(',')))
+    if level not in unlocked:
+        return redirect(url_for('levels'))
+    return render_template('game.html', level=level)
+
 @socketio.on('join')
 def handle_join(data):
-    start_time = time.time()
     level = data['level']
     username = session['username']
     room_id = f"level_{level}"
@@ -273,79 +333,323 @@ def handle_join(data):
     join_room(room_id)
     clients[request.sid] = {"username": username, "room": room_id}
     
-    room = game_rooms[room_id]
-    room["scores"][username] = room["scores"].get(username, 0)
-    room["players"].add(username)
+    if room_id not in game_rooms:
+        game_rooms[room_id] = {
+            "players": set(),
+            "active": False,
+            "level": level,
+            "time_left": 60,
+            "missions_completed": 0,
+            "mission_states": [],
+            "state": None,
+            "timer_thread": None,
+            "room_id": room_id
+        }
     
-    emit('init', {
-        "username": username,
-        "puzzle": room["puzzle"] or "Starting soon...",
-        "time_left": room["time_left"],
-        "scores": room["scores"],
-        "players": list(room["players"])
-    })
+    room = game_rooms[room_id]
+    room["players"].add(username)
+    room["active"] = True
+    room["time_left"] = 60
+    room["mission_states"] = generate_unique_states(level)
+    room["state"] = room["mission_states"][0]
+    room["missions_completed"] = 0
+    
+    logger.debug(f"{username} joined {room_id}, initial state: {room['state']}")
+    emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
     emit('message', f"{username} joined Level {level}!", room=room_id)
     
-    if not room["active"]:
-        room["questions_asked"] = []
-        room["correct_count"] = 0
-        start_game(room_id)
-        if not room["timer_thread"] or not room["timer_thread"].is_alive():
-            import threading
-            room["timer_thread"] = threading.Thread(target=timer, args=(room_id,), daemon=True)
-            room["timer_thread"].start()
-    
-    logger.debug(f"Join completed for {room_id} in {time.time() - start_time:.3f}s")
+    if room["timer_thread"] and room["timer_thread"].is_alive():
+        room["active"] = False
+        room["timer_thread"].join()
+    import threading
+    room["timer_thread"] = threading.Thread(target=timer, args=(room_id,), daemon=True)
+    room["timer_thread"].start()
 
-@socketio.on('message')
-def handle_message(data):
+@socketio.on('game_action')
+def handle_game_action(data):
     room_id = clients[data['sid']]["room"]
     username = clients[data['sid']]["username"]
-    msg = data['msg']
+    action = data['action']
     room = game_rooms[room_id]
-    if msg.startswith("solve "):
-        guess = msg[6:].strip().upper()
-        if guess == room["answer"] and room["active"]:
-            room["scores"][username] += 10
-            room["correct_count"] += 1
-            emit('message', f"{username} solved it! Answer: {room['answer']} ({room['correct_count']}/3)", room=room_id)
-            emit('update_scores', room["scores"], room=room_id)
-            conn = sqlite3.connect('users.db')
-            c = conn.cursor()
-            c.execute("UPDATE users SET total_score = total_score + 10 WHERE username = ?", (username,))
-            current_level = room["level"]
-            if current_level < 6 and room["correct_count"] == 3:
-                next_level = current_level + 1
-                if next_level not in session['unlocked_levels']:
-                    session['unlocked_levels'].append(next_level)
-                    c.execute("UPDATE users SET unlocked_levels = ? WHERE username = ?",
-                             (",".join(map(str, session['unlocked_levels'])), username))
-                    emit('message', f"Level {next_level} unlocked!", room=room_id)
-                    emit('update_levels', session['unlocked_levels'], to=data['sid'])
-                    logger.debug(f"Unlocked Level {next_level} for {username}")
-            conn.commit()
-            conn.close()
-            socketio.sleep(0.5)
-            start_game(room_id)
+    
+    if not room["active"]:
+        logger.debug(f"Room {room_id} not active, action ignored")
+        return
+    
+    state = room["state"]
+    logger.debug(f"Processing action for {state['type']} - Mission {room['missions_completed'] + 1}, State: {state}")
+    
+    if state["type"] == "path":
+        index = action["index"]
+        moves = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+        row, col = divmod(state["pos"], state["size"])
+        new_row, new_col = divmod(index, state["size"])
+        for dr, dc in moves:
+            if row + dr == new_row and col + dc == new_col and 0 <= index < state["size"] * state["size"] and state["grid"][index] != "💀":
+                state["grid"][state["pos"]] = ""
+                state["grid"][index] = "🤖"
+                state["pos"] = index
+                state["moves"] -= 1
+                emit('update_path', {"grid": state["grid"], "moves": state["moves"]}, room=room_id)
+                if index == state["size"] * state["size"] - 1:
+                    room["missions_completed"] += 1
+                    logger.debug(f"Path Finder: Mission {room['missions_completed']} completed")
+                    emit('mission_complete', f"Mission {room['missions_completed']}/3 done!", room=room_id)
+                    emit('animate_win', room=room_id)
+                    if room["missions_completed"] < 3:
+                        room["state"] = room["mission_states"][room["missions_completed"]]
+                        room["time_left"] = 60
+                        logger.debug(f"Transitioning to mission {room['missions_completed'] + 1}, New state: {room['state']}")
+                        emit('round_transition', room=room_id)
+                        emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
+                    else:
+                        logger.debug(f"Level {room['level']} completed")
+                        update_score_and_badges(room, username)
+                elif state["moves"] <= 0:
+                    emit('game_over', "Out of moves! Try again!", room=room_id)
+                    room["state"] = room["mission_states"][room["missions_completed"]]
+                    emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
+                break
+    elif state["type"] == "shape":
+        index = action["index"]
+        slot = action["slot"]
+        if len(state["sorted"]) < len(state["grid"]) // 2 and state["grid"][index] not in state["sorted"]:
+            state["sorted"].append(state["grid"][index])
+            emit('place_shape', {"index": index, "slot": slot, "shape": state["grid"][index]}, room=room_id)
+            if len(state["sorted"]) == len(state["grid"]) // 2:
+                room["missions_completed"] += 1
+                logger.debug(f"Shape Sorter: Mission {room['missions_completed']} completed")
+                emit('mission_complete', f"Mission {room['missions_completed']}/3 done!", room=room_id)
+                emit('animate_win', room=room_id)
+                if room["missions_completed"] < 3:
+                    room["state"] = room["mission_states"][room["missions_completed"]]
+                    room["time_left"] = 60
+                    logger.debug(f"Transitioning to mission {room['missions_completed'] + 1}, New state: {room['state']}")
+                    emit('round_transition', room=room_id)
+                    emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
+                else:
+                    logger.debug(f"Level {room['level']} completed")
+                    update_score_and_badges(room, username)
+    elif state["type"] == "number":
+        index = action["index"]
+        if index not in state["used"] and 0 <= index < len(state["grid"]):
+            state["sum"] += state["grid"][index]
+            state["used"].append(index)
+            emit('update_sum', {"sum": state["sum"], "used": state["used"]}, room=room_id)
+            logger.debug(f"Number Crunch: Sum={state['sum']}, Target={state['target']}, Used={state['used']}")
+            if state["sum"] == state["target"]:
+                room["missions_completed"] += 1
+                logger.debug(f"Number Crunch: Mission {room['missions_completed']} completed")
+                emit('mission_complete', f"Mission {room['missions_completed']}/3 done!", room=room_id)
+                emit('animate_win', room=room_id)
+                if room["missions_completed"] < 3:
+                    logger.debug(f"Preparing transition to mission {room['missions_completed'] + 1}")
+                    room["state"] = room["mission_states"][room["missions_completed"]]
+                    room["state"]["sum"] = 0
+                    room["state"]["used"] = []
+                    room["time_left"] = 60
+                    logger.debug(f"Transitioning to mission {room['missions_completed'] + 1}, New state: {room['state']}")
+                    emit('round_transition', room=room_id)
+                    emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
+                else:
+                    logger.debug(f"Level {room['level']} completed")
+                    update_score_and_badges(room, username)
+            elif state["sum"] > state["target"] or len(state["used"]) == len(state["grid"]):
+                emit('game_over', "Sum wrong or no moves left! Try again!", room=room_id)
+                room["state"] = room["mission_states"][room["missions_completed"]]
+                room["state"]["sum"] = 0
+                room["state"]["used"] = []
+                emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
+    elif state["type"] == "word":
+        letter = action["letter"].upper()
+        logger.debug(f"Word Weaver: Guessing letter '{letter}' for word {state['word']}")
+        
+        if len(letter) != 1 or not letter.isalpha():
+            emit('message', "Please enter a single letter!", room=room_id)
+            return
+        
+        if letter in state["guessed_letters"]:
+            emit('message', "Letter already guessed!", room=room_id)
+            return
+        
+        state["guessed_letters"].append(letter)
+        if letter in state["word"]:
+            for i, char in enumerate(state["word"]):
+                if char == letter:
+                    state["progress"][i] = letter
         else:
-            emit('message', "Wrong guess!", to=data['sid'])
-    else:
-        emit('message', f"{username}: {msg}", room=room_id)
+            state["attempts_left"] -= 1
+        
+        emit('word_update', {
+            "word": " ".join(state["progress"]),
+            "attempts": state["attempts_left"],
+            "guessed": state["guessed_letters"]
+        }, room=room_id)
+        
+        if '_' not in state["progress"]:
+            room["missions_completed"] += 1
+            logger.debug(f"Word Weaver: Mission {room['missions_completed']} completed")
+            emit('mission_complete', f"Mission {room['missions_completed']}/3 done! Word was '{state['word']}'.", room=room_id)
+            emit('animate_win', room=room_id)
+            if room["missions_completed"] < 3:
+                room["state"] = room["mission_states"][room["missions_completed"]]
+                room["time_left"] = 60
+                logger.debug(f"Transitioning to mission {room['missions_completed'] + 1}, New state: {room['state']}")
+                emit('round_transition', room=room_id)
+                emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
+            else:
+                logger.debug(f"Level {room['level']} completed")
+                update_score_and_badges(room, username)
+        elif state["attempts_left"] <= 0:
+            emit('game_over', f"Game Over! The word was '{state['word']}'.", room=room_id)
+            room["state"] = room["mission_states"][room["missions_completed"]]
+            room["time_left"] = 60
+            emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
+    elif state["type"] == "switch":
+        index = action["index"]
+        size = state["size"]
+        for i in [index, index - size, index + size, index - 1, index + 1]:
+            if 0 <= i < size * size and (i // size == index // size or i % size == index % size):
+                state["grid"][i] = 1 - state["grid"][i]
+        logger.debug(f"Switch action on {index}, new grid: {state['grid']}")  # Debug switch action
+        emit('update_switch', {"grid": state["grid"]}, room=room_id)
+        if all(state["grid"]):
+            room["missions_completed"] += 1
+            logger.debug(f"Switch Swap: Mission {room['missions_completed']} completed")
+            emit('mission_complete', f"Mission {room['missions_completed']}/3 done!", room=room_id)
+            emit('animate_win', room=room_id)
+            if room["missions_completed"] < 3:
+                room["state"] = room["mission_states"][room["missions_completed"]]
+                room["time_left"] = 60
+                logger.debug(f"Transitioning to mission {room['missions_completed'] + 1}, New state: {room['state']}")
+                emit('round_transition', room=room_id)
+                emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
+            else:
+                logger.debug(f"Level {room['level']} completed")
+                update_score_and_badges(room, username)
+    elif state["type"] == "treasure":
+        index = action["index"]
+        if index not in state["revealed"] and state["taps"] > 0:
+            state["revealed"].append(index)
+            state["taps"] -= 1
+            emit('reveal_treasure', {"index": index, "value": state["grid"][index], "taps": state["taps"]}, room=room_id)
+            if state["grid"][index] == "🏴‍☠️":
+                room["missions_completed"] += 1
+                logger.debug(f"Treasure Tap: Mission {room['missions_completed']} completed")
+                emit('mission_complete', f"Mission {room['missions_completed']}/3 done!", room=room_id)
+                emit('animate_win', room=room_id)
+                if room["missions_completed"] < 3:
+                    room["state"] = room["mission_states"][room["missions_completed"]]
+                    room["time_left"] = 60
+                    logger.debug(f"Transitioning to mission {room['missions_completed'] + 1}, New state: {room['state']}")
+                    emit('round_transition', room=room_id)
+                    emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
+                else:
+                    logger.debug(f"Level {room['level']} completed")
+                    update_score_and_badges(room, username)
+            elif state["taps"] <= 0:
+                emit('game_over', "No taps left! Try again!", room=room_id)
+                room["state"] = room["mission_states"][room["missions_completed"]]
+                emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
+    elif state["type"] == "unscramble":
+        index = action["index"]
+        state["guess"].append(state["letters"][index])
+        emit('update_unscramble', {"guess": state["guess"]}, room=room_id)
+        if len(state["guess"]) == len(state["phrase"].replace(" ", "")):
+            guess_str = "".join(state["guess"])
+            if guess_str == state["phrase"].replace(" ", ""):
+                room["missions_completed"] += 1
+                logger.debug(f"Unscramble: Mission {room['missions_completed']} completed")
+                emit('mission_complete', f"Mission {room['missions_completed']}/3 done!", room=room_id)
+                emit('animate_win', room=room_id)
+                if room["missions_completed"] < 3:
+                    room["state"] = room["mission_states"][room["missions_completed"]]
+                    room["time_left"] = 60
+                    logger.debug(f"Transitioning to mission {room['missions_completed'] + 1}, New state: {room['state']}")
+                    emit('round_transition', room=room_id)
+                    emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
+                else:
+                    logger.debug(f"Level {room['level']} completed")
+                    update_score_and_badges(room, username)
+            else:
+                emit('message', "Wrong phrase! Try again.", room=room_id)
+                state["guess"] = []
+                emit('reset_unscramble', room=room_id)
+    elif state["type"] == "pattern":
+        choice = action["choice"]
+        if choice == state["correct"]:
+            room["missions_completed"] += 1
+            logger.debug(f"Pattern: Mission {room['missions_completed']} completed")
+            emit('mission_complete', f"Mission {room['missions_completed']}/3 done!", room=room_id)
+            emit('animate_win', room=room_id)
+            if room["missions_completed"] < 3:
+                room["state"] = room["mission_states"][room["missions_completed"]]
+                room["time_left"] = 60
+                logger.debug(f"Transitioning to mission {room['missions_completed'] + 1}, New state: {room['state']}")
+                emit('round_transition', room=room_id)
+                emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
+            else:
+                logger.debug(f"Level {room['level']} completed")
+                update_score_and_badges(room, username)
+        else:
+            emit('message', "Wrong number! Try again.", room=room_id)
+            room["state"] = room["mission_states"][room["missions_completed"]]
+            emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
+    elif state["type"] == "jigsaw":
+        index = action["index"]
+        slot = action["slot"]
+        piece = state["pieces"][index]
+        if piece not in state["placed"]:
+            state["placed"].append(piece)
+            emit('place_piece', {"index": index, "slot": slot, "piece": piece}, room=room_id)
+            if len(state["placed"]) == state["size"] * state["size"]:
+                room["missions_completed"] += 1
+                logger.debug(f"Jigsaw: Mission {room['missions_completed']} completed")
+                emit('mission_complete', f"Mission {room['missions_completed']}/3 done!", room=room_id)
+                emit('animate_win', room=room_id)
+                if room["missions_completed"] < 3:
+                    room["state"] = room["mission_states"][room["missions_completed"]]
+                    room["time_left"] = 60
+                    logger.debug(f"Transitioning to mission {room['missions_completed'] + 1}, New state: {room['state']}")
+                    emit('round_transition', room=room_id)
+                    emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
+                else:
+                    logger.debug(f"Level {room['level']} completed")
+                    update_score_and_badges(room, username)
+    elif state["type"] == "riddle":
+        choice = action["choice"]
+        if choice == state["correct"]:
+            room["missions_completed"] += 1
+            logger.debug(f"Riddle: Mission {room['missions_completed']} completed")
+            emit('mission_complete', f"Mission {room['missions_completed']}/3 done!", room=room_id)
+            emit('animate_win', room=room_id)
+            if room["missions_completed"] < 3:
+                room["state"] = room["mission_states"][room["missions_completed"]]
+                room["time_left"] = 60
+                logger.debug(f"Transitioning to mission {room['missions_completed'] + 1}, New state: {room['state']}")
+                emit('round_transition', room=room_id)
+                emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
+            else:
+                logger.debug(f"Level {room['level']} completed")
+                update_score_and_badges(room, username)
+        else:
+            emit('message', "Wrong answer! Try again.", room=room_id)
+            room["state"] = room["mission_states"][room["missions_completed"]]
+            emit('init_game', {"state": room["state"], "time_left": room["time_left"]}, room=room_id)
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    client = clients.pop(request.sid, None)
-    if client:
-        room_id = client["room"]
-        username = client["username"]
-        room = game_rooms[room_id]
-        room["players"].discard(username)
-        if username in room["scores"]:
-            del room["scores"][username]
-        emit('message', f"{username} left the game!", room=room_id)
-        emit('update_scores', room["scores"], room=room_id)
-        emit('update_players', list(room["players"]), room=room_id)
+    if request.sid in clients:
+        username = clients[request.sid]["username"]
+        room_id = clients[request.sid]["room"]
+        if room_id in game_rooms:
+            room = game_rooms[room_id]
+            room["players"].discard(username)
+            emit('message', f"{username} left the game.", room=room_id)
+            if not room["players"]:
+                room["active"] = False
+                del game_rooms[room_id]
+        del clients[request.sid]
 
 if __name__ == "__main__":
-    logger.info("Server starting...")
-    socketio.run(app, host='0.0.0.0', port=5000)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000)

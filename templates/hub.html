@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindMeld - Hub</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">MindMeld - Hub</h1>
+        <div class="menu-box">
+            <h2>Welcome, {{ username }}!</h2>
+            <p>Your Score: {{ score }}</p>
+            <div class="button-group">
+                <a href="{{ url_for('levels') }}" class="home-btn">Levels</a>
+                <a href="{{ url_for('leaderboard') }}" class="leaderboard-btn">Leaderboard</a>
+                <a href="{{ url_for('badges') }}" class="badges-btn">Badges</a>
+            </div>
+            <div class="logout-container">
+                <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
