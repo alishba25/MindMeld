@@ -1,89 +1,84 @@
-const socket = io();
-let username;
+let socket = io();
+let gameState = null;
 
-socket.on('init', (data) => {
-    username = data.username;
-    document.getElementById('puzzle-text').textContent = data.puzzle || "Waiting for puzzle...";
-    document.getElementById('timer').textContent = `${data.time_left}s`;
-    updateTimerBar(data.time_left);
-    updateScores(data.scores);
-    updatePlayers(data.players);
+// When the game connects to the server
+socket.on('connect', () => {
+    console.log('Connected to the game server!');
+    document.getElementById('test-message').innerText = 'Connected to server!';
 });
 
-socket.on('message', (msg) => {
-    const chatBox = document.getElementById('chat-box');
-    const p = document.createElement('p');
-    p.textContent = msg;
-    chatBox.appendChild(p);
-    chatBox.scrollTop = chatBox.scrollHeight;
+// Update the board when the server sends new information
+socket.on('update_game', (data) => {
+    console.log('Board updated:', data);
+    gameState = data.state;
+    drawBoard();
 });
 
-socket.on('new_game', (data) => {
-    document.getElementById('puzzle-text').textContent = data.puzzle;
-    document.getElementById('timer').textContent = `${data.time_left}s`;
-    updateTimerBar(data.time_left);
+// Show if you win or lose
+socket.on('game_result', (data) => {
+    console.log('Game result:', data);
+    document.getElementById('result').innerText = data.result === 'win' ? 'You Win!' : 'Game Over!';
 });
 
-socket.on('timer_update', (time) => {
-    document.getElementById('timer').textContent = `${time}s`;
-    updateTimerBar(time);
+// Set up the level and board
+socket.on('level_data', (data) => {
+    console.log('Starting level:', data);
+    gameState = data.state;
+    document.getElementById('level').innerText = 'Level ' + data.level;
+    drawBoard();
 });
 
-socket.on('game_over', (msg) => {
-    document.getElementById('chat-box').innerHTML += `<p>${msg}</p>`;
-});
-
-socket.on('update_scores', (scores) => {
-    updateScores(scores);
-});
-
-socket.on('update_players', (players) => {
-    updatePlayers(players);
-});
-
-socket.on('level_complete', (msg) => {
-    document.getElementById('chat-box').innerHTML += `<p style="color: #00ff00; font-weight: bold;">${msg}</p>`;
-    document.getElementById('puzzle-text').textContent = "Level Completed!";
-    document.getElementById('timer').textContent = "0s";
-    document.getElementById('timer-bar').style.width = "0%";
-    document.getElementById('msg-input').disabled = true;
-});
-
-function updateTimerBar(time) {
-    const bar = document.getElementById('timer-bar');
-    const percentage = (time / 60) * 100;
-    bar.style.width = `${percentage}%`;
-}
-
-function updateScores(scores) {
-    const scoreList = document.getElementById('score-list');
-    scoreList.innerHTML = '';
-    for (const [player, score] of Object.entries(scores)) {
-        const li = document.createElement('li');
-        li.textContent = `${player}: ${score}`;
-        scoreList.appendChild(li);
+// Draw the tiles on the board
+function drawBoard() {
+    const board = document.getElementById('game-board');
+    board.innerHTML = ''; // Clear the old tiles
+    if (!gameState) {
+        console.log('No game state to show!');
+        return;
+    }
+    if (gameState.type === "number_alphabet") {
+        board.innerHTML = ''; // Clear the old tiles
+        const current_round = gameState.rounds[gameState.current_round];
+        const sequenceDiv = document.createElement('div');
+        sequenceDiv.textContent = `Round ${gameState.current_round + 1}/3: ${current_round.sequence.join(', ')}, ?`;
+        sequenceDiv.className = 'sequence-text';
+        const optionsDiv = document.createElement('div');
+        current_round.options.forEach((opt, index) => {
+            const btn = document.createElement('button');
+            btn.textContent = opt;
+            btn.className = 'option-btn';
+            btn.addEventListener('click', () => {
+                console.log('Selected option:', opt);
+                clickTile(opt);
+            });
+            optionsDiv.appendChild(btn);
+        });
+        board.appendChild(sequenceDiv);
+        board.appendChild(optionsDiv);
+    } else {
+        // Existing logic for other game types
+        const flatGrid = Array.isArray(gameState.grid[0]) ? [].concat(...gameState.grid) : gameState.grid;
+        const gridSize = Math.sqrt(flatGrid.length);
+        console.log('Grid size calculated as:', gridSize, 'Total tiles:', flatGrid.length);
+        flatGrid.forEach((cell, index) => {
+            const tile = document.createElement('div');
+            tile.classList.add('tile');
+            tile.dataset.index = index;
+            tile.textContent = gameState.revealed.includes(index) ? cell : '?';
+            tile.addEventListener('click', () => {
+                console.log('Clicked tile at index:', index);
+                clickTile(index);
+            });
+            board.appendChild(tile);
+        });
     }
 }
 
-function updatePlayers(players) {
-    const playerList = document.getElementById('player-list');
-    playerList.innerHTML = '';
-    players.forEach(player => {
-        const li = document.createElement('li');
-        li.textContent = player;
-        playerList.appendChild(li);
-    });
-}
-
-function sendMessage() {
-    const input = document.getElementById('msg-input');
-    const msg = input.value.trim();
-    if (msg) {
-        socket.emit('message', { sid: socket.id, msg: msg });
-        input.value = '';
+// Handle clicks for options or other actions
+function clickTile(choice) {
+    if (gameState) {
+        socket.emit('tile_click', { choice: choice });
+    } else {
+        console.log('Game not ready to click!');
     }
 }
-
-document.getElementById('msg-input').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendMessage();
-});

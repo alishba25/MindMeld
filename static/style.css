@@ -30,6 +30,50 @@ body {
     animation: glow 2s infinite alternate;
 }
 
+.tile {
+    width: 50px;
+    height: 50px;
+    border: 1px solid #00d4ff;
+    cursor: pointer;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    transition: transform 0.3s;
+    background-color: #1b263b;
+    overflow: hidden;
+}
+
+.tile.shape-piece {
+    background-color: #ffd700; /* Gold color for shape pieces */
+    color: #000; /* Black text for contrast */
+}
+
+.jigsaw-pieces {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-right: 20px;
+}
+
+.jigsaw-slots {
+    display: grid;
+    gap: 35px;
+}
+
+#shape-hint {
+    color: #ffd700;
+    text-shadow: 0 0 5px #ffd700;
+    font-size: 1.2em;
+    margin: 10px 0;
+}
+#target-shape {
+    font-weight: bold;
+    color: #00d4ff;
+    text-shadow: 0 0 5px #00d4ff;
+}
+
 @keyframes glow {
     from { text-shadow: 0 0 5px #00d4ff, 0 0 10px #00d4ff; }
     to { text-shadow: 0 0 15px #00d4ff, 0 0 25px #00d4ff; }
@@ -286,16 +330,10 @@ tr.highlight {
 
 .game-board {
     display: grid;
-    width: 400px;
-    height: 400px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 3px solid #00d4ff;
-    border-radius: 15px;
-    padding: 15px;
-    margin-bottom: 20px;
-    box-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
-    transition: transform 0.5s;
-    gap: 5px;
+    gap: 35px; /* Increased from 5px to ensure space between tiles */
+    margin: 20px auto; /* Center the board */
+    width: fit-content; /* Fit the grid size */
+    box-sizing: border-box; /* Prevent padding issues */
 }
 
 .game-board.win {
