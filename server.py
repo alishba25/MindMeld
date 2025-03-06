@@ -219,7 +219,7 @@ def generate_unique_states(level):
 def index():
     if 'username' in session:
         return redirect(url_for('hub'))
-    return render_template('login.html')  # Default to login page
+    return render_template('auth.html')  # Use new combined auth template
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
