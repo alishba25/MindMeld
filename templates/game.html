@@ -134,6 +134,10 @@
 
         socket.on('mission_complete', (msg) => {
             document.getElementById('missions').textContent = msg;
+            if (msg.includes('Mission 3/3')) {  // If it's the final mission
+                document.getElementById('timer').style.display = "none";
+                document.getElementById('timer-bar').style.display = "none";
+            }
             showConfetti();
         });
 
@@ -141,8 +145,11 @@
             document.getElementById('chat-box').innerHTML += `<p style="color: #00ff00; font-weight: bold;">${msg}</p>`;
             document.getElementById('game-board').innerHTML = "Level Completed!";
             document.getElementById('game-board').classList.add('win');
-            document.getElementById('timer').textContent = "0s";
-            document.getElementById('timer-bar').style.width = "0%";
+            
+            // Hide timer elements
+            document.getElementById('timer').style.display = "none";
+            document.getElementById('timer-bar').style.display = "none";
+            
             showConfetti();
         });
 
@@ -462,6 +469,7 @@
     </script>
 </body>
 </html>
+
 
 
 
