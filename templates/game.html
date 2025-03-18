@@ -221,6 +221,23 @@
             document.getElementById('chat-box').innerHTML += `<p>${msg}</p>`;
         });
 
+        socket.on('update_sequence', (data) => {
+            const cell = document.getElementById(`cell-${data.index}`);
+            if (cell) {
+                cell.classList.add('selected');
+                cell.onclick = null; // Remove click handler
+            }
+        });
+
+        socket.on('sequence_reset', () => {
+            const cells = document.querySelectorAll('.sequence-level .game-cell');
+            cells.forEach(cell => {
+                cell.classList.remove('selected');
+                const index = parseInt(cell.id.split('-')[1]);
+                cell.onclick = () => socket.emit('tile_click', { index: index });
+            });
+        });
+
         function updateTimerBar(time) {
             const bar = document.getElementById('timer-bar');
             const percentage = (time / 60) * 100;
@@ -453,6 +470,39 @@
                 boardenergy.appendChild(questionDiv);
                 boardenergy.appendChild(optionsDiv);
                 instructions.textContent = "Solve the riddle!";
+            } else if (gameState.type === "sequence") {
+                boardenergy.className = 'sequence-level';
+                boardenergy.style.gridTemplateColumns = `repeat(${gameState.size}, 1fr)`;
+                boardenergy.style.gridTemplateRows = `repeat(${gameState.size}, 1fr)`;
+                
+                // Display the sequence to follow
+                const sequenceDisplay = document.createElement('div');
+                sequenceDisplay.className = 'sequence-display';
+                sequenceDisplay.textContent = `Find this sequence: ${gameState.sequence.join(' → ')}`;
+                boardenergy.appendChild(sequenceDisplay);
+                
+                // Create the grid
+                const gridContainer = document.createElement('div');
+                gridContainer.className = 'sequence-grid';
+                gridContainer.style.gridTemplateColumns = `repeat(${gameState.size}, 1fr)`;
+                
+                gameState.grid.forEach((item, index) => {
+                    const cell = document.createElement('div');
+                    cell.id = `cell-${index}`;
+                    cell.className = 'game-cell';
+                    cell.textContent = item;
+                    
+                    if (!gameState.selected.includes(index)) {
+                        cell.onclick = () => socket.emit('tile_click', { index: index });
+                    } else {
+                        cell.classList.add('selected');
+                    }
+                    
+                    gridContainer.appendChild(cell);
+                });
+                
+                boardenergy.appendChild(gridContainer);
+                instructions.textContent = "Click the tiles in the correct sequence!";
             }
         }
 

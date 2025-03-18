@@ -28,6 +28,65 @@ socket.on('level_data', (data) => {
     drawBoard();
 });
 
+// Add to your existing socket handlers
+socket.on('update_sequence', (data) => {
+    const cells = document.querySelectorAll('.game-cell');
+    // Remove all click handlers first
+    cells.forEach(cell => {
+        cell.onclick = null;
+    });
+    
+    // Add selected class to newly selected cell
+    cells[data.index].classList.add('selected');
+    
+    // Re-enable click handlers only for unselected cells
+    cells.forEach((cell, idx) => {
+        if (!data.selected.includes(idx)) {
+            cell.onclick = () => socket.emit('tile_click', { index: idx });
+        }
+    });
+});
+
+socket.on('sequence_reset', () => {
+    const cells = document.querySelectorAll('.game-cell');
+    cells.forEach((cell, idx) => {
+        cell.classList.remove('selected');
+        cell.onclick = () => socket.emit('tile_click', { index: idx });
+    });
+});
+
+socket.on('init_game', (data) => {
+    gameState = data.state;
+    if (gameState.type === "sequence") {
+        const board = document.getElementById('game-board');
+        board.innerHTML = '';
+        board.className = 'sequence-level';
+        
+        const sequenceDisplay = document.createElement('div');
+        sequenceDisplay.className = 'sequence-display';
+        sequenceDisplay.textContent = `Find this sequence: ${gameState.sequence.join(' → ')}`;
+        board.appendChild(sequenceDisplay);
+        
+        const grid = document.createElement('div');
+        grid.className = 'sequence-grid';
+        grid.style.gridTemplateColumns = `repeat(${gameState.size}, 1fr)`;
+        
+        gameState.grid.forEach((item, idx) => {
+            const cell = document.createElement('div');
+            cell.className = 'game-cell';
+            cell.textContent = item;
+            if (!gameState.selected.includes(idx)) {
+                cell.onclick = () => socket.emit('tile_click', { index: idx });
+            } else {
+                cell.classList.add('selected');
+            }
+            grid.appendChild(cell);
+        });
+        
+        board.appendChild(grid);
+    }
+});
+
 // Draw the tiles on the board
 function drawBoard() {
     const board = document.getElementById('game-board');

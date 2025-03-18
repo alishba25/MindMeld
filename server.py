@@ -273,49 +273,93 @@ def generate_unique_states(level):
             random.shuffle(options)
             states.append({"type": "pattern", "pattern": pattern.copy(), "options": options.copy(), "correct": correct})
     
-    elif level <= 27:  # Number-Alphabet Sequence with 3 rounds
-        for _ in range(1):  # 1 state per level, with 3 rounds
-           base_length = 2 + (level - 25)  # Base length for Round 1
-           rounds = []
-           for round_num in range(3):
-               sequence_length = base_length + round_num  # Increases per round
-               sequence = []
-               step = random.choice([1, 2])  # Random step for difficulty
-               for i in range(sequence_length):
+    elif level <= 27:  # Number-Alphabet Sequence
+        base_length = 2 + (level - 25)  # Base length increases with level (2, 3, 4)
+        for _ in range(3):  # 3 missions per level
+            sequence = []
+            for i in range(base_length * 2):  # Double length for alternating pattern
                 if i % 2 == 0:
-                    sequence.append(str(i // 2 * step + 1))  # Numbers with step
+                    sequence.append(str(i // 2 + 1))  # Numbers: 1, 2, 3...
                 else:
-                    sequence.append(chr(65 + i // 2 * step))  # Alphabets with step
-               correct_next = sequence[-1][-1].isalpha() and chr(ord(sequence[-1][-1]) + step) or str(int(sequence[-1]) + step)
-               options = [correct_next] + [str(random.randint(1, 10)) for _ in range(2)] + [chr(random.randint(65, 75)) for _ in range(2)]
-               random.shuffle(options)
-               attempts = sequence_length  # Attempts equal to sequence length
-               rounds.append({
-                "sequence": sequence.copy(),
-                "options": options.copy(),
-                "correct": correct_next,
-                "attempts": attempts,
-                "current_attempt": 0
+                    sequence.append(chr(65 + i // 2))  # Letters: A, B, C...
+            
+            # Create grid with sequence plus additional items
+            grid = sequence.copy()
+            extras = []
+            for i in range(16 - len(sequence)):  # Fill remaining spots in 4x4 grid
+                if i % 2 == 0:
+                    extras.append(str(len(sequence) // 2 + i // 2 + 1))
+                else:
+                    extras.append(chr(65 + len(sequence) // 2 + i // 2))
+            
+            grid.extend(extras)
+            random.shuffle(grid)
+            
+            states.append({
+                "type": "sequence",
+                "grid": grid,
+                "sequence": sequence,
+                "selected": [],
+                "size": 4  # 4x4 grid
             })
-        states.append({
-            "type": "number_alphabet",
-            "rounds": rounds,
-            "current_round": 0,
-            "completed": False
-        })
 
     elif level <= 30:  # Riddles
-        riddle_sets = [
-            [("I’m tall and green, what am I?", "Tree", ["Car", "Dog", "Tree"])],
-            [("I fly without wings, what am I?", "Kite", ["Bird", "Plane", "Kite"]),
-             ("I’m round and bright, what am I?", "Sun", ["Moon", "Star", "Sun"])],
-            [("I’m full of holes but hold water, what am I?", "Sponge", ["Net", "Bucket", "Sponge"]),
-             ("I’m cold and sweet, what am I?", "Ice", ["Snow", "Cake", "Ice"]),
-             ("I bark but don’t bite, what am I?", "Dog", ["Cat", "Wolf", "Dog"])]
-        ]
-        for riddle in riddle_sets[level - 28]:
-            states.append({"type": "riddle", "question": riddle[0], "options": riddle[2].copy(), "correct": riddle[1]})
+        riddle_sets = {
+            28: [  # Level 28 riddles
+                ("I'm tall and green, what am I?", "Tree", ["Car", "Dog", "Tree"]),
+                ("I have keys but no locks, space but no room, you can enter but not go in. What am I?", "Keyboard", ["Phone", "Keyboard", "Door"]),
+                ("I'm always hungry; I must always be fed. The finger I touch, will soon turn red. What am I?", "Fire", ["Water", "Fire", "Wind"])
+            ],
+            29: [  # Level 29 riddles
+                ("What has keys, but no locks; space, but no room; and you can enter, but not go in?", "Piano", ["Guitar", "Piano", "Drum"]),
+                ("What gets wetter and wetter the more it dries?", "Towel", ["Sponge", "Towel", "Paper"]),
+                ("What has a head and a tail that will never meet?", "Coin", ["Snake", "Coin", "Rope"])
+            ],
+            30: [  # Level 30 riddles
+                ("I have cities, but no houses. I have mountains, but no trees. I have water, but no fish. I have roads, but no cars. What am I?", "Map", ["Globe", "Map", "Picture"]),
+                ("What is always in front of you but can't be seen?", "Future", ["Past", "Future", "Present"]),
+                ("I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?", "Echo", ["Music", "Echo", "Voice"])
+            ]
+        }
+        
+        current_riddles = riddle_sets[level]
+        for riddle in current_riddles:
+            states.append({
+                "type": "riddle",
+                "question": riddle[0],
+                "options": riddle[2].copy(),
+                "correct": riddle[1]
+            })
     return states
+
+def generate_sequence_level(level):
+    size = 4  # 4x4 grid
+    if level == 25:
+        # Numbers sequence
+        sequence = [str(i) for i in range(1, 7)]  # 1,2,3,4,5,6
+        grid = sequence + [str(i) for i in range(7, 17)]  # Fill rest with numbers
+    elif level == 26:
+        # Alphabet sequence
+        sequence = ['A', 'B', 'C', 'D', 'E', 'F']
+        grid = sequence + [chr(ord('G') + i) for i in range(10)]  # Fill rest with letters
+    else:  # level 27
+        # Mixed sequence
+        sequence = ['1', 'A', '2', 'B', '3', 'C']
+        grid = sequence + ['4', 'D', '5', 'E', '6', 'F', '7', 'G', '8', 'H']
+
+    # Shuffle the grid while keeping track of correct positions
+    positions = list(range(len(grid)))
+    random.shuffle(positions)
+    shuffled_grid = [grid[i] for i in positions]
+
+    return {
+        "type": "sequence",
+        "size": size,
+        "grid": shuffled_grid,
+        "sequence": sequence,
+        "selected": [],
+        "completed": False
+    }
 
 @app.route('/')
 def index():
@@ -753,40 +797,60 @@ def handle_game_action(data):
 
 @socketio.on('tile_click')
 def handle_tile_click(data):
-    room = clients.get(request.sid)
-    if not room:
+    room_id = clients.get(request.sid, {}).get('room')
+    if not room_id or room_id not in game_rooms:
         return
-    game = game_rooms.get(room)
-    if not game:
-        return
+    
+    room = game_rooms[room_id]
+    state = room['state']
     index = data.get('index')
-    choice = data.get('choice')
-    if game['level'] in range(16, 19):  # Treasure Tap
-        state = game['state']
+    
+    if room['level'] in range(25, 28):  # Sequence levels
+        if index is None or index >= len(state['grid']):
+            return
+            
+        # Prevent double-clicking the same tile
+        if index in state['selected']:
+            return
+            
+        current_pos = len(state['selected'])
+        clicked_value = state['grid'][index]
+        
+        if clicked_value == state['sequence'][current_pos]:
+            state['selected'].append(index)
+            emit('update_sequence', {
+                'index': index,
+                'value': clicked_value,
+                'selected': state['selected']  # Send full selected array
+            }, room=room_id)
+            
+            if len(state['selected']) == len(state['sequence']):
+                room['missions_completed'] += 1
+                emit('mission_complete', f"Mission {room['missions_completed']}/3 complete!", room=room_id)
+                
+                if room['missions_completed'] < 3:
+                    room['state'] = room['mission_states'][room['missions_completed']]
+                    room['state']['selected'] = []  # Reset selected for new mission
+                    emit('init_game', {'state': room['state']}, room=room_id)
+                else:
+                    update_score_and_badges(room, session.get('username'))
+                    emit('level_complete', room=room_id)
+        else:
+            state['selected'] = []
+            emit('sequence_reset', room=room_id)
+            emit('message', "Wrong sequence! Try again!", room=room_id)
+    elif room['level'] in range(16, 19):  # Treasure Tap
+        state = room['state']
         if index is not None and index < len(state['grid']) and index not in state['revealed']:
             state['revealed'].append(index)
             state['taps'] -= 1
             if state['grid'][index] == "🏴‍☠️":
-                emit('game_result', {'result': 'win'}, room=room)
+                emit('game_result', {'result': 'win'}, room=room_id)
             elif state['taps'] <= 0:
-                emit('game_result', {'result': 'lose'}, room=room)
-            emit('update_game', {'state': state}, room=room)
-    elif game['level'] in range(25, 28):  # Number-Alphabet Sequence
-        state = game['state']
-        current_round = state['rounds'][state['current_round']]
-        if choice and choice in current_round['options']:
-            current_round['current_attempt'] += 1
-            if choice == current_round['correct']:
-                if state['current_round'] + 1 < len(state['rounds']):
-                    state['current_round'] += 1
-                    emit('update_game', {'state': state}, room=room)
-                else:
-                    state['completed'] = True
-                    emit('game_result', {'result': 'win'}, room=room)
-            elif current_round['current_attempt'] >= current_round['attempts']:
-                emit('game_result', {'result': 'lose'}, room=room)
-            emit('update_game', {'state': state}, room=room)
-# Other level types remain unchanged    
+                emit('game_result', {'result': 'lose'}, room=room_id)
+            emit('update_game', {'state': state}, room=room_id)
+    else:
+        return
 
 @socketio.on('place_piece')
 def handle_place_piece(data):
