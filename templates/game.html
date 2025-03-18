@@ -44,7 +44,11 @@
     <div id="failure" class="failure"></div>
     <script>
         const socket = io();
-        socket.emit('join', { level: {{ level }} });
+        let clientSid = '';
+        socket.on('connect', () => {
+            clientSid = socket.id;
+        });
+        socket.emit('join', { level: Number(document.querySelector('h2#level').textContent.split(' ')[1]) });
         let gameState;
 
         socket.on('init_game', (data) => {
@@ -187,13 +191,37 @@
                     cell.id = `cell-${index}`;
                     cell.className = 'game-cell';
                     cell.textContent = item || '';
-                    if (item === "🤖" || item === "🏁" || item === "💀") {
+                    
+                    // Calculate current position and possible moves
+                    const robotPos = gameState.grid.indexOf("🤖");
+                    const robotRow = Math.floor(robotPos / gameState.size);
+                    const robotCol = robotPos % gameState.size;
+                    const currentRow = Math.floor(index / gameState.size);
+                    const currentCol = index % gameState.size;
+                    
+                    // Check if this cell is adjacent to the robot
+                    const isAdjacent = (
+                        (Math.abs(currentRow - robotRow) === 1 && currentCol === robotCol) ||
+                        (Math.abs(currentCol - robotCol) === 1 && currentRow === robotRow)
+                    );
+                    
+                    // Allow clicking only on valid adjacent empty cells
+                    if (isAdjacent && (!item || item === "🏁") && gameState.moves > 0) {
                         cell.style.cursor = 'pointer';
-                        cell.onclick = () => socket.emit('game_action', { sid: socket.id, action: { index: index } });
+                        cell.classList.add('clickable');
+                        cell.onclick = () => {
+                            socket.emit('game_action', {
+                                sid: clientSid,
+                                action: {
+                                    index: index
+                                }
+                            });
+                        };
                     }
+                    
                     boardenergy.appendChild(cell);
                 });
-                instructions.textContent = `Moves Left: ${gameState.moves}`;
+                instructions.textContent = `Guide the robot (🤖) to the flag (🏁). Moves left: ${gameState.moves}`;
             } else if (gameState.type === "shape") {
                 boardenergy.style.gridTemplateColumns = "repeat(2, 1fr)";
                 boardenergy.style.gridTemplateRows = "1fr";
@@ -316,27 +344,27 @@
             } else if (gameState.type === "number_alphabet") {
                 boardenergy.style.display = "flex";
                 boardenergy.style.flexDirection = "column";
-            if (gameState && gameState.rounds) {
-                const current_round = gameState.rounds[gameState.current_round];
+                if (gameState && gameState.rounds) {
+                    const current_round = gameState.rounds[gameState.current_round];
 
-                const sequenceDiv = document.createElement('div');
-                sequenceDiv.textContent = `${current_round.sequence.join(', ')}, ?`;
-                sequenceDiv.className = 'sequence-text';
-                const optionsDiv = document.createElement('div');
-                current_round.options.forEach((opt, index) => {
-                    const btn = document.createElement('button');
-                    btn.textContent = opt;
-                    btn.className = 'option-btn';
-                    btn.onclick = () => {
-                        console.log('Selected option:', opt); // Debug log
-                        socket.emit('tile_click', { choice: opt }); // Ensure correct event emission
-                    };
-                    optionsDiv.appendChild(btn);
-                });
-                boardenergy.appendChild(sequenceDiv);
-                boardenergy.appendChild(optionsDiv);
-                instructions.textContent = `Attempts Left: ${current_round.attempts - current_round.current_attempt}`;
-
+                    const sequenceDiv = document.createElement('div');
+                    sequenceDiv.textContent = `${current_round.sequence.join(', ')}, ?`;
+                    sequenceDiv.className = 'sequence-text';
+                    const optionsDiv = document.createElement('div');
+                    current_round.options.forEach((opt, index) => {
+                        const btn = document.createElement('button');
+                        btn.textContent = opt;
+                        btn.className = 'option-btn';
+                        btn.onclick = () => {
+                            console.log('Selected option:', opt); // Debug log
+                            socket.emit('tile_click', { choice: opt }); // Ensure correct event emission
+                        };
+                        optionsDiv.appendChild(btn);
+                    });
+                    boardenergy.appendChild(sequenceDiv);
+                    boardenergy.appendChild(optionsDiv);
+                    instructions.textContent = `Attempts Left: ${current_round.attempts - current_round.current_attempt}`;
+                }
             } else if (gameState.type === "memory_match") {
                 boardenergy.style.gridTemplateColumns = `repeat(${gameState.size}, 50px)`;
                 boardenergy.style.gridTemplateRows = `repeat(${gameState.size}, 50px)`;
@@ -413,13 +441,27 @@
         });
     </script>
     <script>
-        const gridSize = {{ grid_size }} || 4; // Default value if grid_size is not provided
+        const gridSize = "{{ grid_size|default(4) }}" * 1; // Convert string to number
+        console.log('Setting grid size to:', gridSize); // Debug log
 
         const gameBoard = document.getElementById('game-board');
-        console.log('Setting grid size to:', gridSize); // Debug log
         gameBoard.style.gridTemplateColumns = `repeat(${gridSize}, 50px)`;
         gameBoard.style.gridTemplateRows = `repeat(${gridSize}, 50px)`;
         gameBoard.style.width = `${gridSize * 85}px`; // Matches 35px gap
     </script>
+    <script>
+        const style = document.createElement('style');
+        style.textContent = `
+            .game-cell.clickable:hover {
+                background-color: rgba(0, 255, 0, 0.2);
+                transform: scale(1.05);
+                transition: all 0.2s ease;
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
 </body>
 </html>
+
+
+

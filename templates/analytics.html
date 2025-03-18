@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindMeld - Analytics</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .chart-container { margin: 20px 0; width: 100%; max-width: 800px; }
+        .menu-box { padding: 20px; }
+        canvas { max-width: 100%; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">MindMeld - Your Analytics</h1>
+        <div class="menu-box">
+            <h2>Welcome, {{ username }}!</h2>
+
+            <!-- IQ Progression Line Chart -->
+            <div class="chart-container">
+                <h3>IQ Progression</h3>
+                <canvas id="iqChart"></canvas>
+            </div>
+
+            <!-- Cognitive Skills Radar Chart -->
+            <div class="chart-container">
+                <h3>Cognitive Skills</h3>
+                <canvas id="skillsChart"></canvas>
+            </div>
+
+            <!-- Level Performance Bar Chart -->
+            <div class="chart-container">
+                <h3>Level Performance</h3>
+                <canvas id="levelChart"></canvas>
+            </div>
+
+            <!-- Category Breakdown Pie Chart -->
+            <div class="chart-container">
+                <h3>Category Breakdown</h3>
+                <canvas id="categoryChart"></canvas>
+            </div>
+
+            <!-- Progress Over Time Heatmap -->
+            <div class="chart-container">
+                <h3>Progress Over Time (Completion Time)</h3>
+                <canvas id="heatmapChart"></canvas>
+            </div>
+
+            <div class="bottom-buttons">
+                <a href="{{ url_for('hub') }}" class="home-btn">Home</a>
+                <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+            </div>
+        </div>
+    </div>
+    <script>
+        // IQ Progression Line Chart
+        const iqCtx = document.getElementById('iqChart').getContext('2d');
+        const iqChart = new Chart(iqCtx, {
+            type: 'line',
+            data: {
+                labels: JSON.parse('{{ iq_labels | tojson | safe }}'),
+                datasets: [{
+                    label: 'MindMeld IQ',
+                    data: JSON.parse('{{ iq_data | tojson | safe }}'),
+                    borderColor: '#00d4ff',
+                    fill: false
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 150,
+                        title: {
+                            display: true,
+                            text: 'IQ Score'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Cognitive Skills Radar Chart
+        const skillsCtx = document.getElementById('skillsChart').getContext('2d');
+        const skillsChart = new Chart(skillsCtx, {
+            type: 'radar',
+            data: {
+                labels: JSON.parse('{{ skills_labels | tojson | safe }}'),
+                datasets: [
+                    {
+                        label: 'Baseline',
+                        data: JSON.parse('{{ baseline_skills | tojson | safe }}'),
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        borderColor: '#ff6384'
+                    },
+                    {
+                        label: 'Current',
+                        data: JSON.parse('{{ current_skills | tojson | safe }}'),
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: '#36a2eb'
+                    }
+                ]
+            },
+            options: {
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+
+        // Level Performance Bar Chart
+        const levelCtx = document.getElementById('levelChart').getContext('2d');
+        const levelChart = new Chart(levelCtx, {
+            type: 'bar',
+            data: {
+                labels: JSON.parse('{{ level_labels | tojson | safe }}'),
+                datasets: [
+                    {
+                        label: 'Avg Completion Time (s)',
+                        data: JSON.parse('{{ level_times | tojson | safe }}'),
+                        backgroundColor: '#36a2eb'
+                    },
+                    {
+                        label: 'Avg Errors',
+                        data: JSON.parse('{{ level_errors | tojson | safe }}'),
+                        backgroundColor: '#ff6384'
+                    }
+                ]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Value'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Levels'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Category Breakdown Pie Chart
+        const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+        const categoryChart = new Chart(categoryCtx, {
+            type: 'pie',
+            data: {
+                labels: JSON.parse('{{ category_labels | tojson | safe }}'),
+                datasets: [{
+                    data: JSON.parse('{{ category_counts | tojson | safe }}'),
+                    backgroundColor: [
+                        '#ff6384',
+                        '#36a2eb',
+                        '#ffce56',
+                        '#4bc0c0',
+                        '#9966ff',
+                        '#ff9f40',
+                        '#c9cbcf',
+                        '#7d7d7d',
+                        '#e7e9ed',
+                        '#ff5733'
+                    ]
+                }]
+            },
+            options: {
+                plugins: {
+                    legend: {
+                        position: 'right'
+                    }
+                }
+            }
+        });
+
+        // Progress Over Time Heatmap
+        const heatmapCtx = document.getElementById('heatmapChart').getContext('2d');
+        const heatmapData = {
+            labels: JSON.parse('{{ heatmap_levels | tojson | safe }}'),
+            datasets: JSON.parse('{{ heatmap_dates | tojson | safe }}').map((date, i) => ({
+                label: date,
+                data: JSON.parse('{{ heatmap_values | tojson | safe }}')[i],
+                backgroundColor: JSON.parse('{{ heatmap_values | tojson | safe }}')[i].map(val => 
+                    val === 0 ? 'rgba(0, 0, 0, 0.1)' : `rgba(0, 212, 255, ${Math.min(1, val / 60)})`)
+            }))
+        };
+
+        const heatmapChart = new Chart(heatmapCtx, {
+            type: 'bar',
+            data: heatmapData,
+            options: {
+                scales: {
+                    x: {
+                        stacked: true,
+                        title: {
+                            display: true,
+                            text: 'Levels'
+                        }
+                    },
+                    y: {
+                        stacked: true,
+                        title: {
+                            display: true,
+                            text: 'Dates'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

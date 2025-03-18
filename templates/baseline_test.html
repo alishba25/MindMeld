@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindMeld - Baseline Test</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
+    <style>
+        .test-container { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .test-section { background: rgba(0, 212, 255, 0.1); padding: 20px; border-radius: 10px; width: 100%; max-width: 600px; text-align: center; }
+        .game-grid { display: grid; gap: 5px; margin: 10px auto; width: fit-content; }
+        .game-cell { width: 50px; height: 50px; background: #1b263b; border: 2px solid #00d4ff; display: flex; align-items: center; justify-content: center; font-size: 1.5em; cursor: pointer; }
+        .game-cell.used { background: #415a77; cursor: not-allowed; }
+        .option-btn { padding: 10px 20px; margin: 5px; background: linear-gradient(45deg, #00d4ff, #007bff); color: #fff; border: none; border-radius: 5px; cursor: pointer; }
+        .option-btn:hover { background: linear-gradient(45deg, #007bff, #00d4ff); }
+        .option-btn:disabled { background: #555; cursor: not-allowed; }
+        .completed { color: #00ff00; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">MindMeld - Baseline Test</h1>
+        <div class="menu-box test-container">
+            <h2>Welcome, {{ username }}! Let's Assess Your Skills</h2>
+            <div id="path-finder" class="test-section">
+                <h3>Path Finder: Guide the robot (🤖) to the flag (🏁)</h3>
+                <div id="path-grid" class="game-grid"></div>
+                <p>Moves Left: <span id="path-moves">5</span> <span id="path-status"></span></p>
+            </div>
+            <div id="number-crunch" class="test-section">
+                <h3>Number Crunch: Select numbers to reach the target</h3>
+                <p>Target: <span id="number-target">10</span> (Current Sum: <span id="number-sum">0</span>) <span id="number-status"></span></p>
+                <div id="number-grid" class="game-grid"></div>
+            </div>
+            <div id="riddle" class="test-section">
+                <h3>Riddle: Solve the riddle</h3>
+                <p id="riddle-question"></p>
+                <div id="riddle-options"></div>
+                <p id="riddle-status"></p>
+            </div>
+            <button id="submit-test" class="play-btn" style="display: none;">Submit Test</button>
+        </div>
+    </div>
+    <script>
+        const socket = io();
+        let testState = {
+            path: { grid: [], moves: 5, pos: 0, completed: false },
+            number: { grid: [], target: 10, sum: 0, used: [], completed: false },
+            riddle: { question: "", options: [], correct: "", answer: "", completed: false }
+        };
+        let startTime = Date.now();
+
+        socket.on('connect', () => socket.emit('init_baseline'));
+
+        socket.on('init_baseline', (data) => {
+            testState.path = data.path;
+            testState.number = data.number;
+            testState.riddle = data.riddle;
+            renderPathFinder();
+            renderNumberCrunch();
+            renderRiddle();
+        });
+
+        function renderPathFinder() {
+            const grid = document.getElementById('path-grid');
+            grid.style.gridTemplateColumns = `repeat(${testState.path.size}, 1fr)`;
+            grid.innerHTML = '';
+            testState.path.grid.forEach((item, index) => {
+                const cell = document.createElement('div');
+                cell.className = 'game-cell';
+                cell.textContent = item || '';
+                if (!testState.path.completed && testState.path.moves > 0) {
+                    cell.onclick = () => socket.emit('path_action', { index });
+                }
+                grid.appendChild(cell);
+            });
+            document.getElementById('path-moves').textContent = testState.path.moves;
+            document.getElementById('path-status').textContent = testState.path.completed ? 'Completed!' : '';
+            document.getElementById('path-status').className = testState.path.completed ? 'completed' : '';
+            checkTestCompletion();
+        }
+
+        function renderNumberCrunch() {
+            const grid = document.getElementById('number-grid');
+            grid.style.gridTemplateColumns = 'repeat(5, 1fr)';
+            grid.innerHTML = '';
+            testState.number.grid.forEach((num, index) => {
+                const cell = document.createElement('div');
+                cell.className = `game-cell ${testState.number.used.includes(index) ? 'used' : ''}`;
+                cell.textContent = testState.number.used.includes(index) ? '' : num;
+                if (!testState.number.completed && !testState.number.used.includes(index)) {
+                    cell.onclick = () => socket.emit('number_action', { index });
+                }
+                grid.appendChild(cell);
+            });
+            document.getElementById('number-sum').textContent = testState.number.sum;
+            document.getElementById('number-target').textContent = testState.number.target;
+            document.getElementById('number-status').textContent = testState.number.completed ? 'Completed!' : '';
+            document.getElementById('number-status').className = testState.number.completed ? 'completed' : '';
+            checkTestCompletion();
+        }
+
+        function renderRiddle() {
+            const question = document.getElementById('riddle-question');
+            const optionsDiv = document.getElementById('riddle-options');
+            question.textContent = testState.riddle.question;
+            optionsDiv.innerHTML = '';
+            testState.riddle.options.forEach(option => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = option;
+                btn.disabled = testState.riddle.completed;
+                btn.onclick = () => socket.emit('riddle_action', { answer: option });
+                optionsDiv.appendChild(btn);
+            });
+            document.getElementById('riddle-status').textContent = testState.riddle.completed ? 
+                (testState.riddle.answer === testState.riddle.correct ? 'Correct!' : 'Incorrect') : '';
+            document.getElementById('riddle-status').className = testState.riddle.completed && 
+                testState.riddle.answer === testState.riddle.correct ? 'completed' : '';
+            checkTestCompletion();
+        }
+
+        socket.on('update_path', (data) => {
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            testState.path.grid = data.grid;
+            testState.path.moves = data.moves;
+            testState.path.pos = data.pos;
+            testState.path.completed = data.completed;
+            renderPathFinder();
+        });
+
+        socket.on('update_number', (data) => {
+            testState.number.sum = data.sum;
+            testState.number.used = data.used;
+            testState.number.completed = data.completed;
+            renderNumberCrunch();
+        });
+
+        socket.on('update_riddle', (data) => {
+            testState.riddle.answer = data.answer;
+            testState.riddle.completed = data.completed;
+            renderRiddle();
+        });
+
+        socket.on('baseline_complete', (data) => {
+            alert(`Baseline Test Completed! Your IQ Score: ${data.iq_score}`);
+            window.location.href = '/hub';
+        });
+
+        function checkTestCompletion() {
+            if (testState.path.completed && testState.number.completed && testState.riddle.completed) {
+                const submitBtn = document.getElementById('submit-test');
+                submitBtn.style.display = 'block';
+                submitBtn.onclick = () => {
+                    const timeTaken = (Date.now() - startTime) / 1000;
+                    socket.emit('submit_baseline', { state: testState, timeTaken });
+                };
+            }
+        }
+    </script>
+</body>
+</html>
