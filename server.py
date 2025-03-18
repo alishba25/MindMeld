@@ -88,11 +88,37 @@ def generate_unique_states(level):
                     grid[pos] = "💀"
             states.append({"type": "path", "grid": grid.copy(), "size": size, "pos": 0, "moves": 5 + (level - 1) * 2})
     elif level <= 6:  # Shape Sorter
-        shape_sets = [["⬜", "◯"], ["◯", "△", "★"], ["⬜", "★", "⬟"]]
-        for shapes in shape_sets[:level - 3]:
-            grid = shapes + shapes
-            random.shuffle(grid)
-            states.append({"type": "shape", "grid": grid.copy(), "sorted": []})
+        # Define shape sets with increasing number of shapes per level
+        shape_sets = {
+            4: [
+                ["⬜", "◯", "△"],  # 3 shapes for level 4
+                ["⬜", "◯", "△"],
+                ["⬜", "◯", "△"]
+            ],
+            5: [
+                ["⬜", "◯", "△", "★", "⬟"],  # 5 shapes for level 5
+                ["⬜", "◯", "△", "★", "⬟"],
+                ["⬜", "◯", "△", "★", "⬟"]
+            ],
+            6: [
+                ["⬜", "◯", "△", "★", "⬟", "❤️", "⬢"],  # 7 shapes for level 6
+                ["⬜", "◯", "△", "★", "⬟", "❤️", "⬢"],
+                ["⬜", "◯", "△", "★", "⬟", "❤️", "⬢"]
+            ]
+        }
+        
+        # Get the shape sets for current level
+        current_shape_sets = shape_sets[level]
+        
+        # Generate three missions for the current level
+        for shapes in current_shape_sets:
+            grid = shapes + shapes  # Double the shapes to create pairs
+            random.shuffle(grid)    # Randomize the order
+            states.append({
+                "type": "shape",
+                "grid": grid.copy(),
+                "sorted": []
+            })
     elif level <= 9:  # Number Crunch
         targets = [10, 15, 20]
         for i in range(3):
