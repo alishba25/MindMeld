@@ -7,6 +7,18 @@
     <link rel="stylesheet" href="/static/style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        #stopwatch {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.2em;
+            color: #00ff00;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: inline-block;
+        }
+    </style>
 </head>
 <body>
     <div class="game-container">
@@ -16,6 +28,7 @@
                 <div id="instructions" class="instructions"></div>
                 <h2 id="level">Level {{ level }}</h2>
                 <div id="game-board" class="game-board"></div>
+                <span id="stopwatch" style="display: none;">Time: 0:00</span>
                 <div id="word-input" style="display: none; margin-top: 10px;">
                     <input type="text" id="letter-input" maxlength="1" placeholder="Guess a letter" style="padding: 5px;">
                     <button id="guess-btn" class="option-btn">Guess</button>
@@ -51,10 +64,31 @@
         socket.emit('join', { level: Number(document.querySelector('h2#level').textContent.split(' ')[1]) });
         let gameState;
 
+        let startTime;
+        let stopwatchInterval;
+        let isStopwatchLevel = false;
+
         socket.on('init_game', (data) => {
             gameState = data.state;
-            document.getElementById('timer').textContent = `${data.time_left}s`;
-            updateTimerBar(data.time_left);
+            const level = Number(document.querySelector('h2#level').textContent.split(' ')[1]);
+            isStopwatchLevel = level >= 13 && level <= 15;
+            
+            if (isStopwatchLevel) {
+                // Hide timer elements and show stopwatch
+                document.getElementById('timer').style.display = "none";
+                document.getElementById('timer-bar').style.display = "none";
+                document.getElementById('stopwatch').style.display = "block";
+                // Start stopwatch
+                startTime = Date.now();
+                startStopwatch();
+            } else {
+                // Show timer elements and hide stopwatch
+                document.getElementById('timer').style.display = "block";
+                document.getElementById('timer-bar').style.display = "block";
+                document.getElementById('stopwatch').style.display = "none";
+                document.getElementById('timer').textContent = `${data.time_left}s`;
+                updateTimerBar(data.time_left);
+            }
             renderGame();
         });
 
@@ -134,7 +168,7 @@
 
         socket.on('mission_complete', (msg) => {
             document.getElementById('missions').textContent = msg;
-            if (msg.includes('Mission 3/3')) {  // If it's the final mission
+            if (msg.includes('Mission 3/3') && !isStopwatchLevel) {
                 document.getElementById('timer').style.display = "none";
                 document.getElementById('timer-bar').style.display = "none";
             }
@@ -146,9 +180,21 @@
             document.getElementById('game-board').innerHTML = "Level Completed!";
             document.getElementById('game-board').classList.add('win');
             
-            // Hide timer elements
-            document.getElementById('timer').style.display = "none";
-            document.getElementById('timer-bar').style.display = "none";
+            if (isStopwatchLevel) {
+                const totalTime = stopStopwatch();
+                const minutes = Math.floor(totalTime / 60);
+                const seconds = totalTime % 60;
+                document.getElementById('stopwatch').textContent = 
+                    `Completed in: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                // Optionally send completion time to server
+                socket.emit('level_completion_time', { 
+                    level: Number(document.querySelector('h2#level').textContent.split(' ')[1]),
+                    time: totalTime 
+                });
+            } else {
+                document.getElementById('timer').style.display = "none";
+                document.getElementById('timer-bar').style.display = "none";
+            }
             
             showConfetti();
         });
@@ -446,6 +492,29 @@
                 document.getElementById('guess-btn').click();
             }
         });
+
+        // Add stopwatch functions
+        function startStopwatch() {
+            if (stopwatchInterval) clearInterval(stopwatchInterval);
+            stopwatchInterval = setInterval(updateStopwatch, 1000);
+        }
+
+        function updateStopwatch() {
+            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsedTime / 60);
+            const seconds = elapsedTime % 60;
+            document.getElementById('stopwatch').textContent = 
+                `Time: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function stopStopwatch() {
+            if (stopwatchInterval) {
+                clearInterval(stopwatchInterval);
+                const totalTime = Math.floor((Date.now() - startTime) / 1000);
+                return totalTime;
+            }
+            return 0;
+        }
     </script>
     <script>
         const gridSize = "{{ grid_size|default(4) }}" * 1; // Convert string to number
@@ -469,6 +538,9 @@
     </script>
 </body>
 </html>
+
+
+
 
 
 

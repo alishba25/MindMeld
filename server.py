@@ -169,37 +169,61 @@ def generate_unique_states(level):
             for i in [index, index - size, index + size, index - 1, index + 1]:
                 if 0 <= i < size * size and (i // size == index // size or i % size == index % size):
                     grid[i] = 1 - grid[i]
-        
-        if level == 13:  # Predefined solvable states for 3x3 grid
-            # Mission 1: Toggle corners (0, 2) - solvable with 2 moves
-            grid1 = [1, 1, 1, 1, 1, 1, 1, 1, 1]
-            toggle(grid1, 3, 0)  # Top-left
-            toggle(grid1, 3, 2)  # Top-right
+    
+        if level == 13:  # 3x3 grid with simpler patterns
+            # Mission 1: Single toggle at center (4) - solvable with 1 move
+            grid1 = [1] * 9  # All lights on
+            toggle(grid1, 3, 4)  # Toggle center
             states.append({"type": "switch", "grid": grid1.copy(), "size": 3})
             
-            # Mission 2: Toggle (1, 3, 5) - solvable with 3 moves
-            grid2 = [1, 1, 1, 1, 1, 1, 1, 1, 1]
-            toggle(grid2, 3, 1)  # Top-middle
-            toggle(grid2, 3, 3)  # Middle-left
-            toggle(grid2, 3, 5)  # Middle-right
+            # Mission 2: Two adjacent toggles - solvable with 2 moves
+            grid2 = [1] * 9
+            toggle(grid2, 3, 1)  # Toggle top-middle
+            toggle(grid2, 3, 4)  # Toggle center
             states.append({"type": "switch", "grid": grid2.copy(), "size": 3})
             
-            # Mission 3: Toggle (0, 4, 8) - solvable with 3 moves
-            grid3 = [1, 1, 1, 1, 1, 1, 1, 1, 1]
-            toggle(grid3, 3, 0)  # Top-left
-            toggle(grid3, 3, 4)  # Center
-            toggle(grid3, 3, 8)  # Bottom-right
+            # Mission 3: Two diagonal toggles - solvable with 2 moves
+            grid3 = [1] * 9
+            toggle(grid3, 3, 0)  # Toggle top-left
+            toggle(grid3, 3, 8)  # Toggle bottom-right
             states.append({"type": "switch", "grid": grid3.copy(), "size": 3})
-        else:
-            # Levels 14 (4x4) and 15 (5x5) use random solvable states
+            
+        elif level == 14:  # 4x4 grid with simple patterns
             for i in range(3):
-                size = 3 + (level - 13)
-                grid = [1] * (size * size)  # Start with all lights on
-                toggle_count = min(size * size, 2 + i + random.randint(0, 2))  # 2-5 toggles
-                toggle_positions = random.sample(range(size * size), toggle_count)
-                for pos in toggle_positions:
-                    toggle(grid, size, pos)
-                states.append({"type": "switch", "grid": grid.copy(), "size": size})
+                grid = [1] * 16  # Start with all lights on
+                # Create simple patterns requiring 2-3 moves
+                if i == 0:
+                    # Toggle center squares - solvable with 2 moves
+                    toggle(grid, 4, 5)
+                    toggle(grid, 4, 10)
+                elif i == 1:
+                    # Toggle corners - solvable with 2 moves
+                    toggle(grid, 4, 0)
+                    toggle(grid, 4, 15)
+                else:
+                    # Toggle middle row - solvable with 3 moves
+                    toggle(grid, 4, 5)
+                    toggle(grid, 4, 6)
+                states.append({"type": "switch", "grid": grid.copy(), "size": 4})
+                
+        else:  # level 15 - 5x5 grid with medium patterns
+            for i in range(3):
+                grid = [1] * 25
+                # Create patterns requiring 2-3 moves
+                if i == 0:
+                    # Toggle center and adjacent - solvable with 2 moves
+                    toggle(grid, 5, 12)
+                    toggle(grid, 5, 13)
+                elif i == 1:
+                    # Toggle diagonal - solvable with 2 moves
+                    toggle(grid, 5, 0)
+                    toggle(grid, 5, 24)
+                else:
+                    # Toggle center cross - solvable with 3 moves
+                    toggle(grid, 5, 12)
+                    toggle(grid, 5, 7)
+                    toggle(grid, 5, 17)
+                states.append({"type": "switch", "grid": grid.copy(), "size": 5})
     elif level <= 18:  # Treasure Tap
     # Increase randomness with a range of treasures
         treasure_range = [1, 2, 3, 4]  # More possible treasures
@@ -813,3 +837,4 @@ def handle_disconnect():
 
 if __name__ == "__main__":
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+
