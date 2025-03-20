@@ -103,7 +103,7 @@
                         <a href="{{ url_for('levels') }}" class="home-btn play-btn">Play</a>
                         <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
                     </div>
-                    <a href="#" id="badges-btn" class="home-btn badges-btn">Badges</a>
+                    <a href="{{ url_for('user_analytics', username=username) }}" class="home-btn analytics-btn">Analytics</a>
                 </div>
             </div>
         </div>

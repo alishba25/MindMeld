@@ -20,9 +20,38 @@ game_rooms = {}
 def init_db():
     with sqlite3.connect('users.db') as conn:
         cursor = conn.cursor()
+        # Existing table
         cursor.execute('''CREATE TABLE IF NOT EXISTS users 
-                          (username TEXT PRIMARY KEY, password TEXT, score INTEGER DEFAULT 0, 
-                           badges TEXT DEFAULT '', unlocked_levels TEXT DEFAULT '1')''')
+                          (username TEXT PRIMARY KEY, 
+                           password TEXT, 
+                           score INTEGER DEFAULT 0, 
+                           badges TEXT DEFAULT '', 
+                           unlocked_levels TEXT DEFAULT '1')''')
+        
+        # New analytics table
+        cursor.execute('''CREATE TABLE IF NOT EXISTS user_analytics
+                          (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                           username TEXT,
+                           game_type TEXT,
+                           level INTEGER,
+                           completion_time INTEGER,
+                           attempts INTEGER,
+                           accuracy FLOAT,
+                           timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                           cognitive_area TEXT,
+                           FOREIGN KEY (username) REFERENCES users(username))''')
+        
+        # Cognitive areas progress table
+        cursor.execute('''CREATE TABLE IF NOT EXISTS cognitive_progress
+                          (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                           username TEXT,
+                           memory_score INTEGER DEFAULT 0,
+                           logic_score INTEGER DEFAULT 0,
+                           pattern_score INTEGER DEFAULT 0,
+                           spatial_score INTEGER DEFAULT 0,
+                           verbal_score INTEGER DEFAULT 0,
+                           timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                           FOREIGN KEY (username) REFERENCES users(username))''')
         conn.commit()
 
 init_db()
@@ -898,6 +927,145 @@ def handle_disconnect():
                 room["active"] = False
                 del game_rooms[room_id]
         del clients[request.sid]
+
+def calculate_improvement(cognitive_progress):
+    if not cognitive_progress or len(cognitive_progress) < 2:
+        return 0.0
+        
+    # Split data into two periods
+    mid_point = len(cognitive_progress) // 2
+    first_period = cognitive_progress[:mid_point]
+    second_period = cognitive_progress[mid_point:]
+    
+    if not first_period or not second_period:
+        return 0.0
+    
+    # Calculate average for first and last entry
+    def calculate_average(entry):
+        return sum(entry[:5]) / 5  # First 5 elements are the cognitive scores
+    
+    initial_avg = calculate_average(first_period[0])
+    current_avg = calculate_average(second_period[-1])
+    
+    # Calculate improvement percentage
+    if initial_avg == 0:
+        return 0.0
+    
+    improvement = ((current_avg - initial_avg) / initial_avg * 100)
+    return round(improvement, 1)
+
+@app.route('/analytics/<username>')
+@login_required
+def user_analytics(username):
+    if username != session['username']:
+        return redirect(url_for('hub'))
+        
+    with sqlite3.connect('users.db') as conn:
+        cursor = conn.cursor()
+        
+        # Get overall progress for each game type
+        cursor.execute("""
+            SELECT game_type, 
+                   ROUND(AVG(accuracy), 2) as avg_accuracy,
+                   COUNT(*) as games_played,
+                   ROUND(AVG(completion_time), 1) as avg_time
+            FROM user_analytics
+            WHERE username = ?
+            GROUP BY game_type
+        """, (username,))
+        overall_stats = cursor.fetchall()
+        
+        # Get latest cognitive scores
+        cursor.execute("""
+            SELECT memory_score, logic_score, pattern_score,
+                   spatial_score, verbal_score, 
+                   strftime('%Y-%m-%d', timestamp) as date
+            FROM cognitive_progress
+            WHERE username = ?
+            ORDER BY timestamp DESC
+            LIMIT 10
+        """, (username,))
+        cognitive_progress = cursor.fetchall()
+        
+        # Get recent activity
+        cursor.execute("""
+            SELECT game_type, level, accuracy, completion_time,
+                   strftime('%Y-%m-%d %H:%M', timestamp) as formatted_time
+            FROM user_analytics
+            WHERE username = ?
+            ORDER BY timestamp DESC
+            LIMIT 5
+        """, (username,))
+        recent_activity = cursor.fetchall()
+        
+        # If no data exists, provide default values
+        if not cognitive_progress:
+            cognitive_progress = [(0, 0, 0, 0, 0, 'No data')]
+        
+        if not overall_stats:
+            overall_stats = [('No games played', 0, 0, 0)]
+            
+    improvement = calculate_improvement(cognitive_progress)
+    
+    return render_template('analytics.html',
+                         username=username,
+                         overall_stats=overall_stats,
+                         cognitive_progress=cognitive_progress,
+                         recent_activity=recent_activity,
+                         improvement=improvement)
+
+def update_analytics(username, game_type, level, completion_time, attempts, accuracy):
+    with sqlite3.connect('users.db') as conn:
+        cursor = conn.cursor()
+        
+        # Update game analytics
+        cursor.execute("""
+            INSERT INTO user_analytics 
+            (username, game_type, level, completion_time, attempts, accuracy, cognitive_area)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (username, game_type, level, completion_time, attempts, accuracy, 
+              get_cognitive_area(game_type)))
+        
+        # Update cognitive scores
+        cognitive_scores = calculate_cognitive_scores(username)
+        cursor.execute("""
+            INSERT INTO cognitive_progress 
+            (username, memory_score, logic_score, pattern_score, spatial_score, verbal_score)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (username, cognitive_scores['memory'], cognitive_scores['logic'],
+              cognitive_scores['pattern'], cognitive_scores['spatial'],
+              cognitive_scores['verbal']))
+        conn.commit()
+
+def get_cognitive_area(game_type):
+    cognitive_mapping = {
+        'path': 'spatial',
+        'shape': 'pattern',
+        'number': 'logic',
+        'word': 'verbal',
+        'unscramble': 'verbal',
+        'riddle': 'logic'
+    }
+    return cognitive_mapping.get(game_type, 'general')
+
+def calculate_cognitive_scores(username):
+    with sqlite3.connect('users.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT cognitive_area, AVG(accuracy) 
+            FROM user_analytics 
+            WHERE username = ? 
+            GROUP BY cognitive_area
+        """, (username,))
+        scores = dict(cursor.fetchall())
+        
+        return {
+            'memory': int(scores.get('memory', 0)),
+            'logic': int(scores.get('logic', 0)),
+            'pattern': int(scores.get('pattern', 0)),
+            'spatial': int(scores.get('spatial', 0)),
+            'verbal': int(scores.get('verbal', 0))
+        }
 
 if __name__ == "__main__":
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)

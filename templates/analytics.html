@@ -2,222 +2,308 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MindMeld - Analytics</title>
+    <title>MindMeld - User Analytics</title>
     <link rel="stylesheet" href="/static/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .chart-container { margin: 20px 0; width: 100%; max-width: 800px; }
-        .menu-box { padding: 20px; }
-        canvas { max-width: 100%; }
+        .chart-container {
+            width: 500px;
+            height: 400px;
+            margin: 20px auto;
+            padding: 20px;
+            background: rgba(13, 27, 42, 0.9);
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2),
+                        inset 0 0 15px rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            backdrop-filter: blur(5px);
+        }
+
+        .chart-container h2 {
+            color: #00d4ff;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            text-align: center;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto !important;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 class="title">MindMeld - Your Analytics</h1>
-        <div class="menu-box">
-            <h2>Welcome, {{ username }}!</h2>
+        <h1>Cognitive Development Analysis - {{ username }}</h1>
+        
+        <!-- Navigation -->
+        <nav>
+            <a href="{{ url_for('hub') }}" class="button">Back to Hub</a>
+        </nav>
 
-            <!-- IQ Progression Line Chart -->
-            <div class="chart-container">
-                <h3>IQ Progression</h3>
-                <canvas id="iqChart"></canvas>
+        <!-- Debug Info -->
+        <div style="display: none;">
+            <p>Cognitive Progress: {{ cognitive_progress }}</p>
+            <p>Overall Stats: {{ overall_stats }}</p>
+            <p>Recent Activity: {{ recent_activity }}</p>
+        </div>
+        
+        <!-- Cognitive Areas Radar Chart -->
+        <div class="chart-container">
+            <h2>Cognitive Skills Overview</h2>
+            <canvas id="cognitiveRadar"></canvas>
+        </div>
+        
+        <!-- Performance Evolution Line Chart -->
+        <div class="chart-container">
+            <h2>Performance Evolution</h2>
+            <div class="improvement-stats">
+                <span class="stat-label">Average Improvement:</span>
+                <span class="stat-value">{{ improvement }}%</span>
             </div>
-
-            <!-- Cognitive Skills Radar Chart -->
-            <div class="chart-container">
-                <h3>Cognitive Skills</h3>
-                <canvas id="skillsChart"></canvas>
+            <canvas id="progressLine"></canvas>
+        </div>
+        
+        <!-- Performance Stats -->
+        <div class="stats-grid">
+            {% for stat in overall_stats %}
+            <div class="stat-card">
+                <h3>{{ stat[0]|title }}</h3>
+                <p>Accuracy: {{ "%.2f"|format(stat[1]) }}%</p>
+                <p>Games Played: {{ stat[2] }}</p>
+                <p>Average Time: {{ "%.1f"|format(stat[3]) }}s</p>
             </div>
-
-            <!-- Level Performance Bar Chart -->
-            <div class="chart-container">
-                <h3>Level Performance</h3>
-                <canvas id="levelChart"></canvas>
-            </div>
-
-            <!-- Category Breakdown Pie Chart -->
-            <div class="chart-container">
-                <h3>Category Breakdown</h3>
-                <canvas id="categoryChart"></canvas>
-            </div>
-
-            <!-- Progress Over Time Heatmap -->
-            <div class="chart-container">
-                <h3>Progress Over Time (Completion Time)</h3>
-                <canvas id="heatmapChart"></canvas>
-            </div>
-
-            <div class="bottom-buttons">
-                <a href="{{ url_for('hub') }}" class="home-btn">Home</a>
-                <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
-            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Recent Activity -->
+        <div class="recent-activity">
+            <h2>Recent Games</h2>
+            <ul>
+                {% for activity in recent_activity %}
+                <li>
+                    {{ activity[0]|title }} (Level {{ activity[1] }})
+                    - Score: {{ "%.1f"|format(activity[2]) }}%
+                    - Time: {{ activity[3] }}s
+                    - {{ activity[4] }}
+                </li>
+                {% endfor %}
+            </ul>
         </div>
     </div>
+
     <script>
-        // IQ Progression Line Chart
-        const iqCtx = document.getElementById('iqChart').getContext('2d');
-        const iqChart = new Chart(iqCtx, {
-            type: 'line',
+        // Radar Chart for Cognitive Areas
+        const radarCtx = document.getElementById('cognitiveRadar').getContext('2d');
+        const cognitiveData = JSON.parse('{{ cognitive_progress[0]|tojson|safe }}');
+        
+        new Chart(radarCtx, {
+            type: 'radar',
             data: {
-                labels: JSON.parse('{{ iq_labels | tojson | safe }}'),
+                labels: ['Memory', 'Logic', 'Pattern Recognition', 'Spatial', 'Verbal'],
                 datasets: [{
-                    label: 'MindMeld IQ',
-                    data: JSON.parse('{{ iq_data | tojson | safe }}'),
-                    borderColor: '#00d4ff',
-                    fill: false
+                    label: 'Cognitive Skills',
+                    data: [
+                        cognitiveData[0],
+                        cognitiveData[1],
+                        cognitiveData[2],
+                        cognitiveData[3],
+                        cognitiveData[4]
+                    ],
+                    backgroundColor: 'rgba(54, 162, 235, 0.4)',
+                    borderColor: 'rgb(54, 162, 235)',
+                    pointBackgroundColor: 'rgb(54, 162, 235)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgb(54, 162, 235)'
                 }]
             },
             options: {
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 150,
-                        title: {
-                            display: true,
-                            text: 'IQ Score'
-                        }
-                    }
-                }
-            }
-        });
-
-        // Cognitive Skills Radar Chart
-        const skillsCtx = document.getElementById('skillsChart').getContext('2d');
-        const skillsChart = new Chart(skillsCtx, {
-            type: 'radar',
-            data: {
-                labels: JSON.parse('{{ skills_labels | tojson | safe }}'),
-                datasets: [
-                    {
-                        label: 'Baseline',
-                        data: JSON.parse('{{ baseline_skills | tojson | safe }}'),
-                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                        borderColor: '#ff6384'
-                    },
-                    {
-                        label: 'Current',
-                        data: JSON.parse('{{ current_skills | tojson | safe }}'),
-                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                        borderColor: '#36a2eb'
-                    }
-                ]
-            },
-            options: {
+                responsive: true,
+                maintainAspectRatio: false,
                 scales: {
                     r: {
                         beginAtZero: true,
-                        max: 100
-                    }
-                }
-            }
-        });
-
-        // Level Performance Bar Chart
-        const levelCtx = document.getElementById('levelChart').getContext('2d');
-        const levelChart = new Chart(levelCtx, {
-            type: 'bar',
-            data: {
-                labels: JSON.parse('{{ level_labels | tojson | safe }}'),
-                datasets: [
-                    {
-                        label: 'Avg Completion Time (s)',
-                        data: JSON.parse('{{ level_times | tojson | safe }}'),
-                        backgroundColor: '#36a2eb'
-                    },
-                    {
-                        label: 'Avg Errors',
-                        data: JSON.parse('{{ level_errors | tojson | safe }}'),
-                        backgroundColor: '#ff6384'
-                    }
-                ]
-            },
-            options: {
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Value'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Levels'
-                        }
-                    }
-                }
-            }
-        });
-
-        // Category Breakdown Pie Chart
-        const categoryCtx = document.getElementById('categoryChart').getContext('2d');
-        const categoryChart = new Chart(categoryCtx, {
-            type: 'pie',
-            data: {
-                labels: JSON.parse('{{ category_labels | tojson | safe }}'),
-                datasets: [{
-                    data: JSON.parse('{{ category_counts | tojson | safe }}'),
-                    backgroundColor: [
-                        '#ff6384',
-                        '#36a2eb',
-                        '#ffce56',
-                        '#4bc0c0',
-                        '#9966ff',
-                        '#ff9f40',
-                        '#c9cbcf',
-                        '#7d7d7d',
-                        '#e7e9ed',
-                        '#ff5733'
-                    ]
-                }]
-            },
-            options: {
-                plugins: {
-                    legend: {
-                        position: 'right'
-                    }
-                }
-            }
-        });
-
-        // Progress Over Time Heatmap
-        const heatmapCtx = document.getElementById('heatmapChart').getContext('2d');
-        const heatmapData = {
-            labels: JSON.parse('{{ heatmap_levels | tojson | safe }}'),
-            datasets: JSON.parse('{{ heatmap_dates | tojson | safe }}').map((date, i) => ({
-                label: date,
-                data: JSON.parse('{{ heatmap_values | tojson | safe }}')[i],
-                backgroundColor: JSON.parse('{{ heatmap_values | tojson | safe }}')[i].map(val => 
-                    val === 0 ? 'rgba(0, 0, 0, 0.1)' : `rgba(0, 212, 255, ${Math.min(1, val / 60)})`)
-            }))
-        };
-
-        const heatmapChart = new Chart(heatmapCtx, {
-            type: 'bar',
-            data: heatmapData,
-            options: {
-                scales: {
-                    x: {
-                        stacked: true,
-                        title: {
-                            display: true,
-                            text: 'Levels'
-                        }
-                    },
-                    y: {
-                        stacked: true,
-                        title: {
-                            display: true,
-                            text: 'Dates'
+                        max: 100,
+                        ticks: {
+                            stepSize: 20,
+                            color: '#e0e1dd',
+                            backdropColor: 'transparent'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        angleLines: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        pointLabels: {
+                            color: '#00d4ff',
+                            font: {
+                                size: 12
+                            }
                         }
                     }
                 },
                 plugins: {
                     legend: {
-                        position: 'top'
+                        labels: {
+                            color: '#e0e1dd',
+                            font: {
+                                size: 12
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Progress Line Chart
+        const lineCtx = document.getElementById('progressLine').getContext('2d');
+        const progressData = JSON.parse('{{ cognitive_progress|tojson|safe }}');
+
+        // Split data into two periods for comparison
+        const midPoint = Math.floor(progressData.length / 2);
+        const firstPeriod = progressData.slice(0, midPoint);
+        const secondPeriod = progressData.slice(midPoint);
+
+        // Process data for both periods
+        const processData = (data) => {
+            return data.map(row => ({
+                date: new Date(row[5]).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric'
+                }),
+                memory: row[0],
+                logic: row[1],
+                pattern: row[2],
+                spatial: row[3],
+                verbal: row[4],
+                average: (row[0] + row[1] + row[2] + row[3] + row[4]) / 5
+            }));
+        };
+
+        const firstPeriodData = processData(firstPeriod);
+        const secondPeriodData = processData(secondPeriod);
+
+        new Chart(lineCtx, {
+            type: 'line',
+            data: {
+                labels: [...firstPeriodData.map(d => d.date), ...secondPeriodData.map(d => d.date)],
+                datasets: [
+                    {
+                        label: 'Initial Performance',
+                        data: [...firstPeriodData.map(d => d.average), ...Array(secondPeriodData.length).fill(null)],
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgba(255, 99, 132, 1)',
+                        fill: false
+                    },
+                    {
+                        label: 'Current Performance',
+                        data: [...Array(firstPeriodData.length).fill(null), ...secondPeriodData.map(d => d.average)],
+                        borderColor: 'rgba(0, 212, 255, 1)',
+                        backgroundColor: 'rgba(0, 212, 255, 0.2)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: 'rgba(0, 212, 255, 1)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgba(0, 212, 255, 1)',
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)',
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: '#e0e1dd',
+                            font: {
+                                size: 12,
+                                family: "'Orbitron', sans-serif"
+                            },
+                            padding: 10,
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: '#e0e1dd',
+                            font: {
+                                size: 11,
+                                family: "'Orbitron', sans-serif"
+                            },
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#e0e1dd',
+                            font: {
+                                size: 12,
+                                family: "'Orbitron', sans-serif"
+                            },
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(13, 27, 42, 0.9)',
+                        titleColor: '#00d4ff',
+                        titleFont: {
+                            size: 13,
+                            family: "'Orbitron', sans-serif",
+                            weight: 'normal'
+                        },
+                        bodyFont: {
+                            size: 12,
+                            family: "'Orbitron', sans-serif"
+                        },
+                        bodyColor: '#fff',
+                        borderColor: '#00d4ff',
+                        borderWidth: 1,
+                        padding: 12,
+                        callbacks: {
+                            title: function(tooltipItems) {
+                                return 'Date: ' + tooltipItems[0].label;
+                            },
+                            label: function(context) {
+                                const label = context.dataset.label || '';
+                                return `${label}: ${context.parsed.y.toFixed(1)}%`;
+                            }
+                        }
                     }
                 }
             }
