@@ -73,17 +73,23 @@ def add_sample_data():
                         get_cognitive_area(game_type)
                     ))
             
-            # Add cognitive progress data with clear improvement trend
+            # Add cognitive progress data with guaranteed improvement trend
             for days_ago in range(30, -1, -1):
                 date = datetime.now() - timedelta(days=days_ago)
                 
                 # Define base scores that show clear progression
-                if days_ago > 15:  # First half (older data)
-                    base_score = random.uniform(40, 55)  # Lower initial scores
-                else:  # Second half (recent data)
-                    base_score = random.uniform(75, 90)  # Higher recent scores
+                progress_factor = (30 - days_ago) / 30.0  # 0.0 to 1.0 progression factor
                 
-                # Add slight random variation to each cognitive area
+                if days_ago > 15:  # First half (older data)
+                    # Start low, gradual improvement
+                    base_score = 40 + (progress_factor * 20)  # 40-60 range
+                else:  # Second half (recent data)
+                    # Continue improvement to higher scores
+                    base_score = 60 + (progress_factor * 30)  # 60-90 range
+                
+                # Add small random variation while ensuring scores don't decrease
+                variation = random.uniform(0, 5)  # Only positive variation
+                
                 cursor.execute("""
                     INSERT INTO cognitive_progress 
                     (username, memory_score, logic_score, pattern_score, 
@@ -91,11 +97,11 @@ def add_sample_data():
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (
                     user,
-                    min(100, base_score + random.uniform(-5, 5)),
-                    min(100, base_score + random.uniform(-5, 5)),
-                    min(100, base_score + random.uniform(-5, 5)),
-                    min(100, base_score + random.uniform(-5, 5)),
-                    min(100, base_score + random.uniform(-5, 5)),
+                    min(100, base_score + variation),
+                    min(100, base_score + variation),
+                    min(100, base_score + variation),
+                    min(100, base_score + variation),
+                    min(100, base_score + variation),
                     date
                 ))
         
@@ -104,6 +110,7 @@ def add_sample_data():
 
 if __name__ == "__main__":
     add_sample_data()
+
 
 
 

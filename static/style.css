@@ -281,24 +281,49 @@ tr.highlight {
 
 .badge-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 15px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
     margin: 20px 0;
 }
 
 .badge-item {
-    background: rgba(255, 0, 255, 0.1);
-    border: 2px solid #ff00ff;
-    border-radius: 10px;
-    padding: 15px;
-    font-size: 1.2em;
-    color: #ff66cc;
-    box-shadow: 0 0 10px rgba(255, 0, 255, 0.3);
-    transition: transform 0.3s;
+    background: rgba(13, 27, 42, 0.8);
+    border: 2px solid #00d4ff;
+    border-radius: 15px;
+    padding: 20px;
+    text-align: center;
+    color: #fff;
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+    transition: all 0.3s ease;
 }
 
 .badge-item:hover {
-    transform: scale(1.1);
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(0, 212, 255, 0.5);
+}
+
+.badge-emoji {
+    font-size: 3em;
+    margin-bottom: 10px;
+    text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+}
+
+.badge-name {
+    font-size: 1.2em;
+    color: #00d4ff;
+    font-family: 'Orbitron', sans-serif;
+    margin-bottom: 8px;
+}
+
+.badge-description {
+    font-size: 0.9em;
+    color: #e0e1dd;
+    opacity: 0.8;
+}
+
+.badge-locked {
+    filter: grayscale(1);
+    opacity: 0.5;
 }
 
 .game-layout {
@@ -663,4 +688,165 @@ tr.highlight {
     transform: none;
     cursor: default;
 }
+
+.stats-container, .activity-container {
+    width: 90%;
+    max-width: 1200px;
+    margin: 30px auto;
+}
+
+.stats-table, .activity-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(13, 27, 42, 0.8);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+}
+
+.stats-table th, .activity-table th {
+    background: rgba(0, 212, 255, 0.2);
+    color: #00d4ff;
+    font-family: 'Orbitron', sans-serif;
+    padding: 15px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 1.1em;
+    text-transform: uppercase;
+}
+
+.stats-table td, .activity-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+    color: #e0e1dd;
+}
+
+.stats-table tr:hover, .activity-table tr:hover {
+    background: rgba(0, 212, 255, 0.1);
+}
+
+.stats-table .area-name {
+    color: #00d4ff;
+    font-weight: 600;
+}
+
+.stats-table .accuracy, .activity-table .score {
+    color: #00ff00;
+}
+
+.activity-table .game-type {
+    color: #00d4ff;
+    font-weight: 600;
+}
+
+.activity-table .level {
+    color: #ffd700;
+}
+
+.activity-table .date {
+    color: #888;
+    font-size: 0.9em;
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 768px) {
+    .stats-container, .activity-container {
+        width: 95%;
+        overflow-x: auto;
+    }
+    
+    .stats-table, .activity-table {
+        font-size: 0.9em;
+    }
+    
+    .stats-table th, .activity-table th,
+    .stats-table td, .activity-table td {
+        padding: 8px 10px;
+    }
+}
+
+.analytics-nav {
+    margin: 30px 0;
+    text-align: left;
+    padding: 0 20px;
+}
+
+.cyber-button {
+    display: inline-flex;
+    align-items: center;
+    background: linear-gradient(90deg, rgba(0, 212, 255, 0.2), rgba(13, 27, 42, 0.8));
+    border: 2px solid #00d4ff;
+    border-radius: 5px;
+    padding: 12px 24px;
+    color: #00d4ff;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1em;
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.3),
+                inset 0 0 5px rgba(0, 212, 255, 0.2);
+}
+
+.cyber-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(0, 212, 255, 0.2),
+        transparent
+    );
+    transition: 0.5s;
+}
+
+.cyber-button:hover {
+    background: linear-gradient(90deg, rgba(0, 212, 255, 0.3), rgba(13, 27, 42, 0.9));
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.5),
+                inset 0 0 10px rgba(0, 212, 255, 0.3);
+    transform: translateY(-2px);
+}
+
+.cyber-button:hover::before {
+    left: 100%;
+}
+
+.cyber-button:active {
+    transform: translateY(1px);
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.4),
+                inset 0 0 8px rgba(0, 212, 255, 0.3);
+}
+
+.cyber-button__icon {
+    margin-right: 10px;
+    font-size: 1.2em;
+    text-shadow: 0 0 5px rgba(0, 212, 255, 0.5);
+}
+
+.cyber-button__text {
+    position: relative;
+    z-index: 1;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .analytics-nav {
+        text-align: center;
+        padding: 0 10px;
+    }
+
+    .cyber-button {
+        padding: 10px 20px;
+        font-size: 0.9em;
+    }
+}
+
+
 

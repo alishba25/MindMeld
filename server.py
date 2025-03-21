@@ -73,6 +73,59 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+BADGES = {
+    "PathMaster": {
+        "emoji": "🗺️",
+        "description": "Master of Navigation - Completed Path Finder challenges",
+        "levels": [1, 2, 3]
+    },
+    "ShapeWhisperer": {
+        "emoji": "⭐",
+        "description": "Shape Sorting Expert - Mastered geometric challenges",
+        "levels": [4, 5, 6]
+    },
+    "NumberNinja": {
+        "emoji": "🔢",
+        "description": "Mathematical Genius - Conquered Number Crunch puzzles",
+        "levels": [7, 8, 9]
+    },
+    "WordWizard": {
+        "emoji": "📚",
+        "description": "Vocabulary Master - Excelled at Word Weaver challenges",
+        "levels": [10, 11, 12]
+    },
+    "SwitchSage": {
+        "emoji": "💡",
+        "description": "Circuit Logic Expert - Mastered Switch Swap puzzles",
+        "levels": [13, 14, 15]
+    },
+    "TreasureHunter": {
+        "emoji": "🏴‍☠️",
+        "description": "Expert Explorer - Found all hidden treasures",
+        "levels": [16, 17, 18]
+    },
+    "WordScrambler": {
+        "emoji": "🔤",
+        "description": "Unscrambling Champion - Solved all word puzzles",
+        "levels": [19, 20, 21]
+    },
+    "PatternPro": {
+        "emoji": "🎯",
+        "description": "Pattern Recognition Expert - Mastered sequence challenges",
+        "levels": [22, 23, 24]
+    },
+    "PuzzlePirate": {
+        "emoji": "🧩",
+        "description": "Jigsaw Genius - Completed all puzzle challenges",
+        "levels": [25, 26, 27]
+    },
+    "RiddleMaster": {
+        "emoji": "🔮",
+        "description": "Riddle Solver Supreme - Conquered all riddles",
+        "levels": [28, 29, 30]
+    }
+}
+
 def update_score_and_badges(room, username):
     with sqlite3.connect('users.db') as conn:
         cursor = conn.cursor()
@@ -82,11 +135,22 @@ def update_score_and_badges(room, username):
         badges = badges.split(',') if badges else []
         unlocked = set(map(int, unlocked.split(','))) if unlocked else {1}
         
-        if room["missions_completed"] == 3 and room["level"] % 3 == 0:
-            badge = f"Badge_{room['level'] // 3}"
-            if badge not in badges:
-                badges.append(badge)
-                emit('message', f"{username} earned {badge}!", room=room["room_id"])
+        # Check for badge eligibility
+        level = room["level"]
+        for badge_name, badge_info in BADGES.items():
+            if level in badge_info["levels"] and level == badge_info["levels"][-1]:
+                # Check if all levels for this badge are completed
+                if all(lvl in unlocked for lvl in badge_info["levels"]):
+                    if badge_name not in badges:
+                        badges.append(badge_name)
+                        emit('message', {
+                            'type': 'badge_earned',
+                            'badge': {
+                                'name': badge_name,
+                                'emoji': badge_info['emoji'],
+                                'description': badge_info['description']
+                            }
+                        }, room=room["room_id"])
         
         next_level = room["level"] + 1
         if next_level <= 30:
@@ -95,10 +159,6 @@ def update_score_and_badges(room, username):
         cursor.execute("UPDATE users SET score = ?, badges = ?, unlocked_levels = ? WHERE username = ?",
                        (score, ','.join(badges), ','.join(map(str, unlocked)), username))
         conn.commit()
-    
-    if room["missions_completed"] == 3:
-        emit('level_complete', f"Level {room['level']} completed by {username}!", room=room["room_id"])
-        room["active"] = False
 
 def generate_unique_states(level):
     states = []
@@ -475,8 +535,8 @@ def badges():
         cursor = conn.cursor()
         cursor.execute("SELECT badges FROM users WHERE username = ?", (username,))
         result = cursor.fetchone()
-        badges = result[0].split(',') if result and result[0] else []
-    return render_template('badges.html', badges=badges)
+        earned_badges = result[0].split(',') if result and result[0] else []
+    return render_template('badges.html', badges=BADGES, earned_badges=earned_badges)
 
 @app.route('/learn/<int:level>')
 @login_required
@@ -940,79 +1000,104 @@ def calculate_improvement(cognitive_progress):
     if not first_period or not second_period:
         return 0.0
     
-    # Calculate average for first and last entry
-    def calculate_average(entry):
-        return sum(entry[:5]) / 5  # First 5 elements are the cognitive scores
+    # Calculate average for first and last periods
+    def calculate_average(entries):
+        if not entries:
+            return 0
+        # Take the average of all entries in the period
+        total = sum(sum(entry[:5]) / 5 for entry in entries)  # First 5 elements are cognitive scores
+        return total / len(entries)
     
-    initial_avg = calculate_average(first_period[0])
-    current_avg = calculate_average(second_period[-1])
+    # Use the minimum score from first period as baseline
+    initial_scores = [sum(entry[:5]) / 5 for entry in first_period]
+    initial_avg = min(initial_scores) if initial_scores else 0
+    
+    # Use the maximum score from second period as current performance
+    current_scores = [sum(entry[:5]) / 5 for entry in second_period]
+    current_avg = max(current_scores) if current_scores else 0
     
     # Calculate improvement percentage
     if initial_avg == 0:
         return 0.0
     
     improvement = ((current_avg - initial_avg) / initial_avg * 100)
-    return round(improvement, 1)
+    return round(max(improvement, 0.0), 1)  # Ensure non-negative improvement
 
-@app.route('/analytics/<username>')
+@app.route('/analytics')
 @login_required
-def user_analytics(username):
-    if username != session['username']:
-        return redirect(url_for('hub'))
-        
+def user_analytics():
+    username = session.get('username')
+    
     with sqlite3.connect('users.db') as conn:
         cursor = conn.cursor()
         
-        # Get overall progress for each game type
+        # Get cognitive progress data
         cursor.execute("""
-            SELECT game_type, 
-                   ROUND(AVG(accuracy), 2) as avg_accuracy,
-                   COUNT(*) as games_played,
-                   ROUND(AVG(completion_time), 1) as avg_time
-            FROM user_analytics
+            SELECT memory_score, logic_score, pattern_score, spatial_score, verbal_score 
+            FROM cognitive_progress 
+            WHERE username = ? 
+            ORDER BY timestamp DESC 
+            LIMIT 1
+        """, (username,))
+        cognitive_progress = cursor.fetchall()
+        
+        # If no cognitive progress data exists, initialize with zeros
+        if not cognitive_progress:
+            cognitive_progress = [(0, 0, 0, 0, 0)]
+
+        # Get overall stats for each game type
+        cursor.execute("""
+            SELECT 
+                cognitive_area,
+                AVG(accuracy) as avg_accuracy,
+                COUNT(*) as games_played,
+                AVG(completion_time) as avg_time
+            FROM user_analytics 
             WHERE username = ?
-            GROUP BY game_type
+            GROUP BY cognitive_area
         """, (username,))
         overall_stats = cursor.fetchall()
         
-        # Get latest cognitive scores
+        # Get recent activity
         cursor.execute("""
-            SELECT memory_score, logic_score, pattern_score,
-                   spatial_score, verbal_score, 
-                   strftime('%Y-%m-%d', timestamp) as date
-            FROM cognitive_progress
+            SELECT 
+                game_type,
+                level,
+                accuracy,
+                completion_time,
+                strftime('%Y-%m-%d %H:%M', timestamp) as game_date
+            FROM user_analytics 
             WHERE username = ?
             ORDER BY timestamp DESC
             LIMIT 10
         """, (username,))
-        cognitive_progress = cursor.fetchall()
-        
-        # Get recent activity
-        cursor.execute("""
-            SELECT game_type, level, accuracy, completion_time,
-                   strftime('%Y-%m-%d %H:%M', timestamp) as formatted_time
-            FROM user_analytics
-            WHERE username = ?
-            ORDER BY timestamp DESC
-            LIMIT 5
-        """, (username,))
         recent_activity = cursor.fetchall()
         
-        # If no data exists, provide default values
-        if not cognitive_progress:
-            cognitive_progress = [(0, 0, 0, 0, 0, 'No data')]
+        # Get progress data for line chart
+        cursor.execute("""
+            SELECT strftime('%Y-%m-%d', timestamp) as date, 
+                   AVG((memory_score + logic_score + pattern_score + spatial_score + verbal_score) / 5.0) as avg_score
+            FROM cognitive_progress 
+            WHERE username = ?
+            GROUP BY date
+            ORDER BY date
+        """, (username,))
+        progress_data = cursor.fetchall()
         
-        if not overall_stats:
-            overall_stats = [('No games played', 0, 0, 0)]
+        # Calculate improvement
+        improvement = 0
+        if len(progress_data) >= 2:
+            initial_score = progress_data[0][1]
+            current_score = progress_data[-1][1]
+            improvement = round(((current_score - initial_score) / initial_score * 100), 1) if initial_score > 0 else 0
             
-    improvement = calculate_improvement(cognitive_progress)
-    
-    return render_template('analytics.html',
-                         username=username,
-                         overall_stats=overall_stats,
-                         cognitive_progress=cognitive_progress,
-                         recent_activity=recent_activity,
-                         improvement=improvement)
+        return render_template('analytics.html',
+                             username=username,
+                             cognitive_progress=cognitive_progress,
+                             progress_data=progress_data,
+                             improvement=improvement,
+                             overall_stats=overall_stats,
+                             recent_activity=recent_activity)
 
 def update_analytics(username, game_type, level, completion_time, attempts, accuracy):
     with sqlite3.connect('users.db') as conn:

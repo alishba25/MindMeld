@@ -3,13 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <title>MindMeld - User Analytics</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        .analytics-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .analytics-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .analytics-nav {
+            margin: 30px 0;
+            text-align: left;
+            padding: 0 20px;
+        }
+
+        .analytics-nav .cyber-button {
+            display: inline-flex;
+            align-items: center;
+            background: linear-gradient(90deg, rgba(0, 212, 255, 0.2), rgba(13, 27, 42, 0.8));
+            border: 2px solid #00d4ff;
+            border-radius: 5px;
+            padding: 12px 24px;
+            color: #00d4ff;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1em;
+            text-decoration: none !important;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.3),
+                        inset 0 0 5px rgba(0, 212, 255, 0.2);
+            min-width: 160px;
+            justify-content: center;
+        }
+
+        .analytics-nav .cyber-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(0, 212, 255, 0.2),
+                transparent
+            );
+            transition: 0.5s;
+        }
+
+        .analytics-nav .cyber-button:hover {
+            background: linear-gradient(90deg, rgba(0, 212, 255, 0.3), rgba(13, 27, 42, 0.9));
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.5),
+                        inset 0 0 10px rgba(0, 212, 255, 0.3);
+            transform: translateY(-2px);
+            text-decoration: none !important;
+            color: #00d4ff;
+        }
+
+        .analytics-nav .cyber-button:hover::before {
+            left: 100%;
+        }
+
+        .analytics-nav .cyber-button:active {
+            transform: translateY(1px);
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.4),
+                        inset 0 0 8px rgba(0, 212, 255, 0.3);
+        }
+
+        .analytics-nav .cyber-button__icon {
+            margin-right: 10px;
+            font-size: 1.2em;
+            text-shadow: 0 0 5px rgba(0, 212, 255, 0.5);
+        }
+
+        .analytics-nav .cyber-button__text {
+            position: relative;
+            z-index: 1;
+            font-weight: 500;
+        }
+
+        .charts-row {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
         .chart-container {
-            width: 500px;
+            flex: 1;
+            min-width: 300px;
+            max-width: 600px;
             height: 400px;
-            margin: 20px auto;
             padding: 20px;
             background: rgba(13, 27, 42, 0.9);
             border-radius: 15px;
@@ -27,69 +123,151 @@
             text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
         }
 
+        .improvement-stats {
+            text-align: center;
+            margin: 15px 0;
+            padding: 10px;
+            background: rgba(0, 212, 255, 0.1);
+            border-radius: 8px;
+        }
+
+        .stat-label {
+            color: #e0e1dd;
+            margin-right: 10px;
+        }
+
+        .stat-value {
+            color: #00ff00;
+            font-weight: bold;
+        }
+
+        .stats-section {
+            margin-top: 40px;
+        }
+
         canvas {
             max-width: 100%;
             height: auto !important;
         }
+
+        @media (max-width: 1200px) {
+            .charts-row {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .chart-container {
+                width: 100%;
+                max-width: none;
+                margin-bottom: 20px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .analytics-container {
+                padding: 10px;
+            }
+
+            .chart-container {
+                padding: 15px;
+                height: 350px;
+            }
+
+            .analytics-nav {
+                text-align: center;
+                padding: 0 10px;
+            }
+
+            .analytics-nav .cyber-button {
+                padding: 10px 20px;
+                font-size: 0.9em;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Cognitive Development Analysis - {{ username }}</h1>
+    <div class="analytics-container">
+        <div class="analytics-header">
+            <h1>Cognitive Development Analysis - {{ username }}</h1>
+        </div>
         
-        <!-- Navigation -->
-        <nav>
-            <a href="{{ url_for('hub') }}" class="button">Back to Hub</a>
+        <nav class="analytics-nav">
+            <a href="{{ url_for('hub') }}" class="cyber-button">
+                <span class="cyber-button__icon">←</span>
+                <span class="cyber-button__text">Back to Hub</span>
+            </a>
         </nav>
 
-        <!-- Debug Info -->
-        <div style="display: none;">
-            <p>Cognitive Progress: {{ cognitive_progress }}</p>
-            <p>Overall Stats: {{ overall_stats }}</p>
-            <p>Recent Activity: {{ recent_activity }}</p>
-        </div>
-        
-        <!-- Cognitive Areas Radar Chart -->
-        <div class="chart-container">
-            <h2>Cognitive Skills Overview</h2>
-            <canvas id="cognitiveRadar"></canvas>
-        </div>
-        
-        <!-- Performance Evolution Line Chart -->
-        <div class="chart-container">
-            <h2>Performance Evolution</h2>
-            <div class="improvement-stats">
-                <span class="stat-label">Average Improvement:</span>
-                <span class="stat-value">{{ improvement }}%</span>
+        <div class="charts-row">
+            <!-- Cognitive Areas Radar Chart -->
+            <div class="chart-container">
+                <h2>Cognitive Skills Overview</h2>
+                <canvas id="cognitiveRadar"></canvas>
             </div>
-            <canvas id="progressLine"></canvas>
-        </div>
-        
-        <!-- Performance Stats -->
-        <div class="stats-grid">
-            {% for stat in overall_stats %}
-            <div class="stat-card">
-                <h3>{{ stat[0]|title }}</h3>
-                <p>Accuracy: {{ "%.2f"|format(stat[1]) }}%</p>
-                <p>Games Played: {{ stat[2] }}</p>
-                <p>Average Time: {{ "%.1f"|format(stat[3]) }}s</p>
+            
+            <!-- Performance Evolution Line Chart -->
+            <div class="chart-container">
+                <h2>Performance Evolution</h2>
+                <div class="improvement-stats">
+                    <span class="stat-label">Overall Improvement:</span>
+                    <span class="stat-value">{{ improvement }}%</span>
+                </div>
+                <canvas id="progressLine"></canvas>
             </div>
-            {% endfor %}
         </div>
-        
-        <!-- Recent Activity -->
-        <div class="recent-activity">
-            <h2>Recent Games</h2>
-            <ul>
-                {% for activity in recent_activity %}
-                <li>
-                    {{ activity[0]|title }} (Level {{ activity[1] }})
-                    - Score: {{ "%.1f"|format(activity[2]) }}%
-                    - Time: {{ activity[3] }}s
-                    - {{ activity[4] }}
-                </li>
-                {% endfor %}
-            </ul>
+
+        <div class="stats-section">
+            <!-- Performance Stats -->
+            <div class="stats-container">
+                <h2>Performance Statistics</h2>
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>Cognitive Area</th>
+                            <th>Accuracy</th>
+                            <th>Games Played</th>
+                            <th>Avg. Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stat in overall_stats %}
+                        <tr>
+                            <td class="area-name">{{ stat[0]|title }}</td>
+                            <td class="accuracy">{{ "%.1f"|format(stat[1]) }}%</td>
+                            <td class="games">{{ stat[2] }}</td>
+                            <td class="time">{{ "%.1f"|format(stat[3]) }}s</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Recent Activity -->
+            <div class="activity-container">
+                <h2>Recent Games</h2>
+                <table class="activity-table">
+                    <thead>
+                        <tr>
+                            <th>Game Type</th>
+                            <th>Level</th>
+                            <th>Score</th>
+                            <th>Time</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for activity in recent_activity %}
+                        <tr>
+                            <td class="game-type">{{ activity[0]|title }}</td>
+                            <td class="level">{{ activity[1] }}</td>
+                            <td class="score">{{ "%.1f"|format(activity[2]) }}%</td>
+                            <td class="time">{{ "%.1f"|format(activity[3]) }}s</td>
+                            <td class="date">{{ activity[4] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -160,105 +338,53 @@
 
         // Progress Line Chart
         const lineCtx = document.getElementById('progressLine').getContext('2d');
-        const progressData = JSON.parse('{{ cognitive_progress|tojson|safe }}');
-
-        // Split data into two periods for comparison
-        const midPoint = Math.floor(progressData.length / 2);
-        const firstPeriod = progressData.slice(0, midPoint);
-        const secondPeriod = progressData.slice(midPoint);
-
-        // Process data for both periods
-        const processData = (data) => {
-            return data.map(row => ({
-                date: new Date(row[5]).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric'
-                }),
-                memory: row[0],
-                logic: row[1],
-                pattern: row[2],
-                spatial: row[3],
-                verbal: row[4],
-                average: (row[0] + row[1] + row[2] + row[3] + row[4]) / 5
-            }));
-        };
-
-        const firstPeriodData = processData(firstPeriod);
-        const secondPeriodData = processData(secondPeriod);
-
+        const progressData = JSON.parse('{{ progress_data|tojson|safe }}');
+        
         new Chart(lineCtx, {
             type: 'line',
             data: {
-                labels: [...firstPeriodData.map(d => d.date), ...secondPeriodData.map(d => d.date)],
-                datasets: [
-                    {
-                        label: 'Initial Performance',
-                        data: [...firstPeriodData.map(d => d.average), ...Array(secondPeriodData.length).fill(null)],
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        pointBackgroundColor: 'rgba(255, 99, 132, 1)',
-                        pointBorderColor: '#fff',
-                        pointHoverBackgroundColor: '#fff',
-                        pointHoverBorderColor: 'rgba(255, 99, 132, 1)',
-                        fill: false
-                    },
-                    {
-                        label: 'Current Performance',
-                        data: [...Array(firstPeriodData.length).fill(null), ...secondPeriodData.map(d => d.average)],
-                        borderColor: 'rgba(0, 212, 255, 1)',
-                        backgroundColor: 'rgba(0, 212, 255, 0.2)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        pointBackgroundColor: 'rgba(0, 212, 255, 1)',
-                        pointBorderColor: '#fff',
-                        pointHoverBackgroundColor: '#fff',
-                        pointHoverBorderColor: 'rgba(0, 212, 255, 1)',
-                        fill: false
-                    }
-                ]
+                labels: progressData.map(entry => entry[0]),  // Dates
+                datasets: [{
+                    label: 'Cognitive Performance',
+                    data: progressData.map(entry => entry[1]),  // Scores
+                    borderColor: 'rgba(0, 212, 255, 1)',
+                    backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: 'rgba(0, 212, 255, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(0, 212, 255, 1)'
+                }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                interaction: {
-                    intersect: false,
-                    mode: 'index'
-                },
                 scales: {
                     y: {
                         beginAtZero: true,
                         max: 100,
                         grid: {
-                            color: 'rgba(255, 255, 255, 0.05)',
-                            drawBorder: false
+                            color: 'rgba(255, 255, 255, 0.1)'
                         },
                         ticks: {
                             color: '#e0e1dd',
                             font: {
-                                size: 12,
-                                family: "'Orbitron', sans-serif"
-                            },
-                            padding: 10,
-                            callback: function(value) {
-                                return value + '%';
+                                size: 12
                             }
                         }
                     },
                     x: {
                         grid: {
-                            display: false
+                            color: 'rgba(255, 255, 255, 0.1)'
                         },
                         ticks: {
                             color: '#e0e1dd',
                             font: {
-                                size: 11,
-                                family: "'Orbitron', sans-serif"
+                                size: 12
                             },
                             maxRotation: 45,
                             minRotation: 45
@@ -268,15 +394,12 @@
                 plugins: {
                     legend: {
                         display: true,
-                        position: 'top',
                         labels: {
                             color: '#e0e1dd',
                             font: {
                                 size: 12,
                                 family: "'Orbitron', sans-serif"
-                            },
-                            usePointStyle: true,
-                            pointStyle: 'circle'
+                            }
                         }
                     },
                     tooltip: {
@@ -284,8 +407,7 @@
                         titleColor: '#00d4ff',
                         titleFont: {
                             size: 13,
-                            family: "'Orbitron', sans-serif",
-                            weight: 'normal'
+                            family: "'Orbitron', sans-serif"
                         },
                         bodyFont: {
                             size: 12,
@@ -296,12 +418,8 @@
                         borderWidth: 1,
                         padding: 12,
                         callbacks: {
-                            title: function(tooltipItems) {
-                                return 'Date: ' + tooltipItems[0].label;
-                            },
                             label: function(context) {
-                                const label = context.dataset.label || '';
-                                return `${label}: ${context.parsed.y.toFixed(1)}%`;
+                                return `Score: ${context.parsed.y.toFixed(1)}%`;
                             }
                         }
                     }

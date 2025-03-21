@@ -37,9 +37,12 @@
                     <p>Welcome to <strong>Riddles</strong>! Read the riddle and choose the correct answer from the options.</p>
                 {% endif %}
             </div>
-            <a href="/game/{{ level }}" class="play-btn">Play Level {{ level }}</a>
-            <a href="/levels" class="back-btn">Back to Levels</a>
+            <div class="button-group">
+                <a href="/game/{{ level }}" class="home-btn">Play Level {{ level }}</a>
+                <a href="/levels" class="home-btn">Back to Levels</a>
+            </div>
         </div>
     </div>
 </body>
 </html>
+

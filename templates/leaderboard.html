@@ -22,9 +22,9 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for i, leader in leaders|enumerate %}
+                        {% for leader in leaders %}
                         <tr class="{{ 'highlight' if leader[0] == username }}">
-                            <td>{{ i + 1 }}</td>
+                            <td>{{ loop.index }}</td>
                             <td>{{ leader[0] }}</td>
                             <td>{{ leader[1] }}</td>
                         </tr>
@@ -35,7 +35,7 @@
             <div class="button-group">
                 <a href="{{ url_for('hub') }}" class="home-btn">Home</a>
                 <a href="{{ url_for('levels') }}" class="home-btn">Levels</a>
-                <a href="{{ url_for('badges') }}" class="badges-btn">Badges</a>
+                <a href="{{ url_for('badges') }}" class="home-btn">Badges</a>
             </div>
             <div class="logout-container">
                 <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
@@ -44,3 +44,4 @@
     </div>
 </body>
 </html>
+

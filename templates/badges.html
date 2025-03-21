@@ -13,21 +13,21 @@
         <div class="menu-box">
             <h2>Your Badges</h2>
             <div class="badge-grid">
-                {% for badge in badges %}
-                {% if badge %}
-                <div class="badge-item">{{ badge }}</div>
-                {% endif %}
+                {% for badge_name, badge_info in badges.items() %}
+                <div class="badge-item {% if badge_name not in earned_badges %}badge-locked{% endif %}">
+                    <div class="badge-emoji">{{ badge_info['emoji'] }}</div>
+                    <div class="badge-name">{{ badge_name }}</div>
+                    <div class="badge-description">{{ badge_info['description'] }}</div>
+                    <div class="badge-levels">Levels: {{ badge_info['levels']|join(', ') }}</div>
+                </div>
                 {% endfor %}
             </div>
             <div class="button-group">
-                <a href="{{ url_for('hub') }}" class="home-btn">Home</a>
-                <a href="{{ url_for('levels') }}" class="home-btn">Levels</a>
-                <a href="{{ url_for('leaderboard') }}" class="leaderboard-btn">Leaderboard</a>
-            </div>
-            <div class="logout-container">
-                <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+                <a href="/hub" class="home-btn">Back to Hub</a>
             </div>
         </div>
     </div>
 </body>
 </html>
+
+
