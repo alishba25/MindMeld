@@ -50,7 +50,7 @@
                         ('Treasure Tap', 16, 18),
                         ('Unscramble Words', 19, 21),
                         ('Pattern Recognition', 22, 24),
-                        ('Jigsaw Puzzle', 25, 27),
+                        ('Sequencing', 25, 27),
                         ('Riddles', 28, 30)
                     ] %}
                     {% for category, start, end in categories %}
@@ -80,7 +80,7 @@
     <script src="/static/script.js"></script>
     <script>
         const socket = io();
-        const levels = {{ levels|tojson|safe }};
+        const levels = { levels,tojson,safe };
         socket.on('update_levels', (newLevels) => {
             updateLevelGrid(newLevels);
         });
@@ -91,11 +91,11 @@
             const categories = [
                 ['Path Finder', 1, 3], ['Shape Sorter', 4, 6], ['Number Crunch', 7, 9],
                 ['Word Weaver', 10, 12], ['Switch Swap', 13, 15], ['Treasure Tap', 16, 18],
-                ['Unscramble Words', 19, 21], ['Pattern Recognition', 22, 24], ['Jigsaw Puzzle', 25, 27],
+                ['Unscramble Words', 19, 21], ['Pattern Recognition', 22, 24], ['Sequencing', 25, 27],
                 ['Riddles', 28, 30]
             ];
             categories.forEach(([category, start, end]) => {
-                let html = `<div class="category-card"><h3>${category}</h3><div class="level-group">`;
+                let html = <div class="category-card"><h3>${category}</h3><div class="level-group">;
                 for (let i = start; i <= end; i++) {
                     html += `
                         <div class="level-item">
@@ -103,16 +103,17 @@
                             ${levelsArray.includes(i) ? 
                                 `<a href="/learn/${i}" class="level-btn learn-btn" data-level="${i}">Learn</a>
                                  <a href="/game/${i}" class="level-btn play-btn" data-level="${i}">Play</a>` : 
-                                `<span class="level-btn locked" data-level="${i}">Locked</span>`}
+                                <span class="level-btn locked" data-level="${i}">Locked</span>}
                         </div>
                     `;
                 }
-                html += `</div></div>`;
+                html += </div></div>;
                 grid.innerHTML += html;
             });
         }
         updateLevelGrid(levels);
     </script>
+    <script>src="/socket.io/socket.io.js"</script>
     {% endif %}
 </body>
 </html>
